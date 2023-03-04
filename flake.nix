@@ -29,7 +29,13 @@
           workspace-binaries = {
             pf = {
               rpath = p: [ ];
-              run_time_ld_library_path = p: [ ];
+              run_time_ld_library_path = p: [
+                p.xorg.libX11
+                p.xorg.libXcursor
+                p.xorg.libXi
+                p.xorg.libXrandr
+                p.libglvnd
+              ];
             };
           };
           extra-overrides = { mkNativeDep, mkEnvDep, p }:
