@@ -1,5 +1,5 @@
 #[cfg(not(target_family = "unix"))]
-compile_error!("pf supports only unix-like environments");
+compile_error!("pi supports only unix-like environments");
 
 use eframe::egui;
 

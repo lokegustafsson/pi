@@ -27,7 +27,7 @@
         rust = import ./rust.nix {
           inherit lib pkgs;
           workspace-binaries = {
-            pf = {
+            pi = {
               rpath = p: [ ];
               run_time_ld_library_path = p: [
                 p.xorg.libX11
@@ -39,7 +39,7 @@
             };
           };
           extra-overrides = { mkNativeDep, mkEnvDep, p }:
-            [ (mkNativeDep "pf" [ ]) ];
+            [ (mkNativeDep "pi" [ ]) ];
         };
       in {
         devShells.default = rust.rustPkgs.workspaceShell {
@@ -51,6 +51,6 @@
           ];
         };
 
-        packages.default = rust.packages.pf;
+        packages.default = rust.packages.pi;
       });
 }
