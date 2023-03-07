@@ -20,8 +20,9 @@ mod query;
 mod snapshot;
 mod view;
 
-const HISTORY: usize = 100;
-const TICK_DELAY: Duration = Duration::from_millis(500);
+const SUBSEC: u64 = 5;
+const TICK_DELAY: Duration = Duration::from_micros(1_000_000 / SUBSEC);
+const HISTORY: usize = (60 * SUBSEC + 1) as usize;
 
 fn main() -> Result<(), eframe::Error> {
     tracing_subscriber::fmt::init();
