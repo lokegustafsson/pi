@@ -5,6 +5,7 @@ args@{
   release ? true,
   rootFeatures ? [
     "pi/default"
+    "query/default"
   ],
   rustPackages,
   buildRustPackages,
@@ -38,6 +39,7 @@ in
   cargo2nixVersion = "0.11.0";
   workspace = {
     pi = rustPackages.unknown.pi."0.1.0";
+    query = rustPackages.unknown.query."0.1.0";
   };
   "registry+https://github.com/rust-lang/crates.io-index".ab_glyph."0.2.20" = overridableMkRustCrate (profileName: rec {
     name = "ab_glyph";
@@ -1410,7 +1412,7 @@ in
     name = "pi";
     version = "0.1.0";
     registry = "unknown";
-    src = fetchCrateLocal workspaceSrc;
+    src = fetchCrateLocal (workspaceSrc + "/crates/pi");
     dependencies = {
       eframe = rustPackages."registry+https://github.com/rust-lang/crates.io-index".eframe."0.21.3" { inherit profileName; };
       tracing = rustPackages."registry+https://github.com/rust-lang/crates.io-index".tracing."0.1.37" { inherit profileName; };
@@ -1468,6 +1470,13 @@ in
     dependencies = {
       unicode_ident = rustPackages."registry+https://github.com/rust-lang/crates.io-index".unicode-ident."1.0.7" { inherit profileName; };
     };
+  });
+  
+  "unknown".query."0.1.0" = overridableMkRustCrate (profileName: rec {
+    name = "query";
+    version = "0.1.0";
+    registry = "unknown";
+    src = fetchCrateLocal (workspaceSrc + "/crates/query");
   });
   
   "registry+https://github.com/rust-lang/crates.io-index".quote."1.0.23" = overridableMkRustCrate (profileName: rec {
