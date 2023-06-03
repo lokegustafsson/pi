@@ -1,4 +1,4 @@
-{ lib, pkgs, workspace-binaries, extra-overrides }:
+{ lib, pkgs, extra-overrides, use-mold ? true }:
 let
   rustPkgs = pkgs.rustBuilder.makePackageSet {
     rustVersion = "latest";
@@ -14,74 +14,59 @@ let
             };
           };
         mkEnvDep = cratename: env-deps:
-          mkNativeDep cratename [
-            (p.rustBuilder.overrides.patches.propagateEnv cratename
-              (lib.attrsets.mapAttrsToList
-                (name: value: { inherit name value; }) env-deps))
-          ];
+          (p.rustBuilder.rustLib.makeOverride {
+            name = cratename;
+            overrideAttrs = drv:
+              (env-deps // {
+                propagatedBuildInputs = (drv.propagatedBuildInputs or [ ]) ++ [
+                  (p.rustBuilder.overrides.patches.propagateEnv cratename
+                    (lib.attrsets.mapAttrsToList
+                      (name: value: { inherit name value; }) env-deps))
+                ];
+              });
+          });
         mkRpath = cratename: libs:
           p.rustBuilder.rustLib.makeOverride {
             name = cratename;
             overrideAttrs = drv: {
-              preFixup = let libPath = lib.makeLibraryPath libs;
+              postFixup = let libPath = lib.makeLibraryPath libs;
               in ''
-                patchelf --set-rpath "${libPath}" $out/bin/${cratename}
+                patchelf --add-rpath "${libPath}" $out/bin/${cratename}
+                patchelf --add-rpath "${libPath}" $bin/bin/${cratename}
               '';
             };
           };
-        mkLdLibraryPath = cratename: libs:
-          mkNativeDep cratename [
-            (p.rustBuilder.overrides.patches.propagateEnv cratename [{
-              name = "LD_LIBRARY_PATH";
-              value = lib.makeLibraryPath libs;
-            }])
-          ];
-      in [
-        (p.rustBuilder.rustLib.makeOverride {
-          overrideArgs = old: {
-            rustcLinkFlags = old.rustcLinkFlags or [ ] ++ [
-              "-C"
-              "linker=${pkgs.clang}/bin/clang"
-              "-C"
-              "link-arg=-fuse-ld=${pkgs.mold}/bin/mold"
-            ];
+        mkOverride = cratename: overrideAttrs:
+          p.rustBuilder.rustLib.makeOverride {
+            name = cratename;
+            inherit overrideAttrs;
           };
-        })
-        (p.rustBuilder.rustLib.makeOverride {
-          registry = "registry+https://github.com/rust-lang/crates.io-index";
-          overrideArgs = old: {
-            rustcLinkFlags = old.rustcLinkFlags or [ ]
-              ++ [ "--cap-lints" "warn" ];
-          };
-        })
-      ] ++ (extra-overrides { inherit mkNativeDep mkEnvDep p; })
-      ++ (builtins.concatLists (builtins.attrValues (builtins.mapAttrs
-        (cratename:
-          { rpath, run_time_ld_library_path }: [
-            (p.rustBuilder.rustLib.makeOverride {
-              name = cratename;
-              overrideAttrs = drv: {
-                preFixup = let libPath = lib.makeLibraryPath (rpath p);
-                in ''
-                  patchelf --set-rpath "${libPath}" $out/bin/${cratename}
-                '';
-              };
-            })
-            (mkLdLibraryPath cratename (run_time_ld_library_path p))
-          ]) workspace-binaries)));
+      in (if use-mold then
+        [
+          (p.rustBuilder.rustLib.makeOverride {
+            overrideArgs = old: {
+              rustcLinkFlags = (old.rustcLinkFlags or [ ]) ++ [
+                "-C"
+                "linker=${pkgs.clang}/bin/clang"
+                "-C"
+                "link-arg=-fuse-ld=${pkgs.mold}/bin/mold"
+              ];
+            };
+          })
+        ]
+      else
+        [ ]) ++ [
+          (p.rustBuilder.rustLib.makeOverride {
+            registry = "registry+https://github.com/rust-lang/crates.io-index";
+            overrideArgs = old: {
+              rustcLinkFlags = (old.rustcLinkFlags or [ ])
+                ++ [ "--cap-lints" "warn" ];
+            };
+          })
+        ] ++ (extra-overrides {
+          inherit mkNativeDep mkEnvDep mkRpath mkOverride p;
+        });
   };
-  wrapIfHasLdLibraryPath = cratename:
-    { rpath, run_time_ld_library_path }:
-    let
-      crate = rustPkgs.workspace.${cratename} { };
-      libPath = lib.makeLibraryPath (run_time_ld_library_path pkgs);
-    in (if libPath == "" then
-      crate
-    else
-      pkgs.writeShellScriptBin cratename ''
-        LD_LIBRARY_PATH="${libPath}" ${crate}/bin/${cratename}
-      '');
-in {
-  inherit rustPkgs;
-  packages = builtins.mapAttrs wrapIfHasLdLibraryPath workspace-binaries;
+in (builtins.mapAttrs (crate: f: f { }) rustPkgs.workspace) // {
+  inherit (rustPkgs) workspaceShell;
 }

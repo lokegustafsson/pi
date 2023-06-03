@@ -26,23 +26,19 @@
         lib = nixpkgs.lib;
         rust = import ./rust.nix {
           inherit lib pkgs;
-          workspace-binaries = {
-            pi = {
-              rpath = p: [ ];
-              run_time_ld_library_path = p: [
+          extra-overrides = { mkNativeDep, mkEnvDep, mkRpath, mkOverride, p }:
+            [
+              (mkRpath "pi" [
                 p.xorg.libX11
                 p.xorg.libXcursor
                 p.xorg.libXi
                 p.xorg.libXrandr
                 p.libglvnd
-              ];
-            };
-          };
-          extra-overrides = { mkNativeDep, mkEnvDep, p }:
-            [ (mkNativeDep "pi" [ ]) ];
+              ])
+            ];
         };
       in {
-        devShells.default = rust.rustPkgs.workspaceShell {
+        devShells.default = rust.workspaceShell {
           packages = let p = pkgs;
           in [
             cargo2nix.outputs.packages.${system}.cargo2nix
@@ -51,6 +47,6 @@
           ];
         };
 
-        packages.default = rust.packages.pi;
+        packages.default = rust.pi;
       });
 }
