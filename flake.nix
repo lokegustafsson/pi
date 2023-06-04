@@ -45,6 +45,15 @@
             p.rust-bin.stable.latest.clippy
             p.rust-bin.stable.latest.default
           ];
+
+          LD_LIBRARY_PATH = let p = pkgs;
+          in lib.makeLibraryPath [
+            p.xorg.libX11
+            p.xorg.libXcursor
+            p.xorg.libXi
+            p.xorg.libXrandr
+            p.libglvnd
+          ];
         };
 
         packages.default = rust.pi;
