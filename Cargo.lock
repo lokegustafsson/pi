@@ -611,6 +611,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ingest"
+version = "0.1.0"
+
+[[package]]
 name = "instant"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -990,7 +994,7 @@ name = "pi"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "query",
+ "ingest",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1037,10 +1041,6 @@ checksum = "5d727cae5b39d21da60fa540906919ad737832fe0b1c165da3a34d6548c849d6"
 dependencies = [
  "unicode-ident",
 ]
-
-[[package]]
-name = "query"
-version = "0.1.0"
 
 [[package]]
 name = "quote"

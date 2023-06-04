@@ -6,7 +6,7 @@ use crate::{
     system::{SystemNavigation, SystemTab},
 };
 use eframe::egui::{self, Ui};
-use query::QueryState;
+use ingest::Ingester;
 
 mod process;
 mod system;
@@ -28,7 +28,7 @@ fn main() -> Result<(), eframe::Error> {
                     process: (),
                     system: SystemNavigation::Cpu,
                 },
-                query: QueryState::new(),
+                ingester: Ingester::new(),
             })
         }),
     )
@@ -36,7 +36,7 @@ fn main() -> Result<(), eframe::Error> {
 
 struct State {
     nav: Navigation,
-    query: QueryState,
+    ingester: Ingester,
 }
 struct Navigation {
     tab: NavigationTab,
@@ -50,7 +50,7 @@ enum NavigationTab {
 }
 impl eframe::App for State {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
-        self.query.poll_update();
+        self.ingester.poll_update();
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -59,14 +59,14 @@ impl eframe::App for State {
             });
             egui::ScrollArea::vertical().show(ui, |ui| match self.nav.tab {
                 NavigationTab::Process => {
-                    ProcessTab::render(ui, &mut self.nav.process, self.query.process_info())
+                    ProcessTab::render(ui, &mut self.nav.process, self.ingester.process_info())
                 }
                 NavigationTab::System => {
-                    SystemTab::render(ui, &mut self.nav.system, self.query.system_info())
+                    SystemTab::render(ui, &mut self.nav.system, self.ingester.system_info())
                 }
             });
         });
-        ctx.request_repaint_after(self.query.safe_sleep_duration())
+        ctx.request_repaint_after(self.ingester.safe_sleep_duration())
     }
 }
 

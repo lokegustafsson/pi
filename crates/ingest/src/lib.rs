@@ -16,14 +16,14 @@ const SUBSEC: u64 = 5;
 pub const TICK_DELAY: Duration = Duration::from_micros(1_000_000 / SUBSEC);
 pub const HISTORY: usize = (60 * SUBSEC + 1) as usize;
 
-pub struct QueryState {
+pub struct Ingester {
     config: Config,
     next_update_instant: Instant,
     scratch_buf: String,
     process_info: ProcessInfo,
     system_info: SystemInfo,
 }
-impl QueryState {
+impl Ingester {
     pub fn new() -> Self {
         Self {
             config: Config::default(),
