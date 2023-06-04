@@ -1415,6 +1415,7 @@ in
     src = fetchCrateLocal (workspaceSrc + "/crates/pi");
     dependencies = {
       eframe = rustPackages."registry+https://github.com/rust-lang/crates.io-index".eframe."0.21.3" { inherit profileName; };
+      query = rustPackages."unknown".query."0.1.0" { inherit profileName; };
       tracing = rustPackages."registry+https://github.com/rust-lang/crates.io-index".tracing."0.1.37" { inherit profileName; };
       tracing_subscriber = rustPackages."registry+https://github.com/rust-lang/crates.io-index".tracing-subscriber."0.3.16" { inherit profileName; };
     };

@@ -1,5 +1,6 @@
-use crate::{query::process::ProcessInfo, view::Component};
+use crate::Component;
 use eframe::egui::Ui;
+use query::ProcessInfo;
 
 pub struct ProcessTab;
 impl Component for ProcessTab {

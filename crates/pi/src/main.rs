@@ -2,27 +2,19 @@
 compile_error!("pi supports only linux");
 
 use crate::{
-    query::Ingester,
-    view::{
-        process::ProcessTab,
-        system::{SystemNavigation, SystemTab},
-        Component,
-    },
+    process::ProcessTab,
+    system::{SystemNavigation, SystemTab},
 };
-use eframe::egui;
+use eframe::egui::{self, Ui};
+use query::{QueryState, TICK_DELAY};
 use std::{
     sync::{Arc, Mutex},
     thread,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
-mod query;
-mod snapshot;
-mod view;
-
-const SUBSEC: u64 = 5;
-const TICK_DELAY: Duration = Duration::from_micros(1_000_000 / SUBSEC);
-const HISTORY: usize = (60 * SUBSEC + 1) as usize;
+mod process;
+mod system;
 
 fn main() -> Result<(), eframe::Error> {
     tracing_subscriber::fmt::init();
@@ -38,7 +30,7 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 fn setup(cc: &eframe::CreationContext) -> State {
-    let ingester = Arc::new(Mutex::new(Ingester::default()));
+    let ingester = Arc::new(Mutex::new(QueryState::default()));
 
     thread::Builder::new()
         .name("pi-ingester".to_owned())
@@ -70,7 +62,7 @@ fn setup(cc: &eframe::CreationContext) -> State {
 
 struct State {
     nav: Navigation,
-    ingester: Arc<Mutex<Ingester>>,
+    ingester: Arc<Mutex<QueryState>>,
 }
 struct Navigation {
     tab: NavigationTab,
@@ -101,4 +93,10 @@ impl eframe::App for State {
             });
         });
     }
+}
+
+pub trait Component {
+    type Navigation;
+    type Info;
+    fn render(ui: &mut Ui, nav: &mut Self::Navigation, info: &Self::Info);
 }

@@ -1,13 +1,10 @@
-use crate::{
-    query::system::{SystemInfo, SystemInfoTick},
-    view::Component,
-    HISTORY, TICK_DELAY,
-};
+use crate::Component;
 use eframe::egui::{
     self,
     plot::{Corner, Legend, Line, Plot, PlotPoints},
     Frame, Grid, Label, Response, Sense, Ui,
 };
+use query::{SystemInfo, SystemInfoTick, HISTORY, TICK_DELAY};
 
 pub struct SystemTab;
 #[derive(Clone, Copy, PartialEq, Eq)]

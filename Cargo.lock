@@ -990,6 +990,7 @@ name = "pi"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "query",
  "tracing",
  "tracing-subscriber",
 ]
