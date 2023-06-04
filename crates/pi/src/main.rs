@@ -6,12 +6,7 @@ use crate::{
     system::{SystemNavigation, SystemTab},
 };
 use eframe::egui::{self, Ui};
-use query::{QueryState, TICK_DELAY};
-use std::{
-    sync::{Arc, Mutex},
-    thread,
-    time::Instant,
-};
+use query::QueryState;
 
 mod process;
 mod system;
@@ -26,43 +21,22 @@ fn main() -> Result<(), eframe::Error> {
             default_theme: eframe::Theme::Light,
             ..Default::default()
         },
-        Box::new(|cc| Box::new(setup(cc))),
+        Box::new(|_| {
+            Box::new(State {
+                nav: Navigation {
+                    tab: NavigationTab::Process,
+                    process: (),
+                    system: SystemNavigation::Cpu,
+                },
+                query: QueryState::new(),
+            })
+        }),
     )
-}
-fn setup(cc: &eframe::CreationContext) -> State {
-    let ingester = Arc::new(Mutex::new(QueryState::default()));
-
-    thread::Builder::new()
-        .name("pi-ingester".to_owned())
-        .spawn({
-            let ingester = Arc::clone(&ingester);
-            let ctx = cc.egui_ctx.clone();
-            move || {
-                let mut deadline = Instant::now();
-                loop {
-                    ingester.lock().unwrap().update();
-                    ctx.request_repaint();
-                    deadline += TICK_DELAY;
-                    if let Some(wait) = deadline.checked_duration_since(Instant::now()) {
-                        thread::sleep(wait);
-                    }
-                }
-            }
-        })
-        .unwrap();
-    State {
-        nav: Navigation {
-            tab: NavigationTab::Process,
-            process: (),
-            system: SystemNavigation::Cpu,
-        },
-        ingester,
-    }
 }
 
 struct State {
     nav: Navigation,
-    ingester: Arc<Mutex<QueryState>>,
+    query: QueryState,
 }
 struct Navigation {
     tab: NavigationTab,
@@ -76,7 +50,7 @@ enum NavigationTab {
 }
 impl eframe::App for State {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
-        let guard = self.ingester.lock().unwrap();
+        self.query.poll_update();
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -85,13 +59,14 @@ impl eframe::App for State {
             });
             egui::ScrollArea::vertical().show(ui, |ui| match self.nav.tab {
                 NavigationTab::Process => {
-                    ProcessTab::render(ui, &mut self.nav.process, &guard.process_info)
+                    ProcessTab::render(ui, &mut self.nav.process, self.query.process_info())
                 }
                 NavigationTab::System => {
-                    SystemTab::render(ui, &mut self.nav.system, &guard.system_info)
+                    SystemTab::render(ui, &mut self.nav.system, self.query.system_info())
                 }
             });
         });
+        ctx.request_repaint_after(self.query.safe_sleep_duration())
     }
 }
 
