@@ -1,10 +1,7 @@
-use crate::snapshot::Snapshot;
-use std::{
-    fs::File,
-    process::Command,
-    time::{Duration, Instant},
-};
+use crate::{handles::Handles, snapshot::Snapshot};
+use std::time::{Duration, Instant};
 
+mod handles;
 mod process;
 mod snapshot;
 mod system;
@@ -26,7 +23,7 @@ pub struct Ingester {
 impl Ingester {
     pub fn new() -> Self {
         Self {
-            handles: Handles::default(),
+            handles: Handles::new(),
             next_update_instant: Instant::now(),
             scratch_buf: String::new(),
             process_info: ProcessInfo::default(),
@@ -44,6 +41,9 @@ impl Ingester {
             .saturating_duration_since(Instant::now())
     }
     fn tick_update(&mut self) {
+        // Possibly refresh handles (added/removed interfaces/disk/etc)
+        self.handles.update();
+
         // All data for a given tick is read as a `Snapshot`.
         let new = Snapshot::new(&mut self.scratch_buf, &mut self.handles);
 
@@ -56,31 +56,5 @@ impl Ingester {
     }
     pub fn system_info(&self) -> &SystemInfo {
         &self.system_info
-    }
-}
-
-struct Handles {
-    meminfo: File,
-    swaps: File,
-    stat: File,
-}
-impl Default for Handles {
-    fn default() -> Self {
-        let user_hz: u32 = {
-            let output = Command::new("getconf").arg("CLK_TCK").output().unwrap();
-            assert!(output.status.success());
-            std::str::from_utf8(&output.stdout)
-                .unwrap()
-                .trim()
-                .parse()
-                .unwrap()
-        };
-        assert_eq!(user_hz, 100);
-
-        Self {
-            meminfo: File::open("/proc/meminfo").unwrap(),
-            swaps: File::open("/proc/swaps").unwrap(),
-            stat: File::open("/proc/stat").unwrap(),
-        }
     }
 }
