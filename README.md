@@ -1,32 +1,61 @@
-## TODO UI
+## UI
 
-- [ ] color code table cells by amount
-- [ ] expand item for threads within process
+- Color cells by amount
+- System tabs: CPU, RAM, DISK, NETWORK, GPU
+- Process list/tree: Granularity user/processgroup/process/thread
+- Process list/tree: Fields CPU/GPU/MEM usage. NET/DISK read/write.
+- Process list/tree: Filters
 
-## TODO system info
+## System Info
 
-- [ ] temperature, cpus and gpu
-- [ ] current disk usage (breakdown, big folders)
-- [x] total ram usage
-- [x] total swap usage
-- [x] each cpu usage
-- [ ] network rx
-- [ ] network tx
-- [ ] disk read
-- [ ] disk write
+### SYSTEM
 
-## TODO process info
+- Handles current / cumulative
+- Threads current / cumulative
+- Processes current / cumulative
+- Uptime
 
-- [ ] user
-- [ ] pid
-- [ ] name
-- [ ] command
-- [ ] cpu
-- [ ] num threads
-- [ ] mem (resident)
-- [ ] network rx
-- [ ] network tx
-- [ ] disk read
-- [ ] disk write
-- [ ] gpu?
+### CPU
 
+- CPU temperature (per CPU / max)
+- CPU usage (per CPU / total)
+
+### MEMORY
+
+- RAM usage and size
+- SWAP usage and size
+
+### DISK
+
+- DISK usage and size (breakdown?, big folders?)
+- DISK read
+- DISK write
+
+### NETWORK
+
+- NETWORK receive
+- NETWORK transmit
+
+### GPU
+
+- GPU max temperature
+- GPU usage
+- VRAM usage
+
+## Process info
+
+- Granularity user/processgroup/process/thread
+- user
+- pgrp
+- pid
+- tid
+- name (thread)
+- command (process)
+- CPU usage (thread)
+- number of threads (process)
+- GPU usage (process)
+- MEM (resident) (process)
+- NETWORK rx (process)
+- NETWORK tx (process)
+- DISK read (process)
+- DISK write (process)
