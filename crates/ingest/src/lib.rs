@@ -17,7 +17,7 @@ pub const TICK_DELAY: Duration = Duration::from_micros(1_000_000 / SUBSEC);
 pub const HISTORY: usize = (60 * SUBSEC + 1) as usize;
 
 pub struct Ingester {
-    config: Config,
+    handles: Handles,
     next_update_instant: Instant,
     scratch_buf: String,
     process_info: ProcessInfo,
@@ -26,7 +26,7 @@ pub struct Ingester {
 impl Ingester {
     pub fn new() -> Self {
         Self {
-            config: Config::default(),
+            handles: Handles::default(),
             next_update_instant: Instant::now(),
             scratch_buf: String::new(),
             process_info: ProcessInfo::default(),
@@ -44,11 +44,10 @@ impl Ingester {
             .saturating_duration_since(Instant::now())
     }
     fn tick_update(&mut self) {
-        let new = Snapshot::new(
-            &mut self.scratch_buf,
-            &mut self.config.meminfo,
-            &mut self.config.stat,
-        );
+        // All data for a given tick is read as a `Snapshot`.
+        let new = Snapshot::new(&mut self.scratch_buf, &mut self.handles);
+
+        // We then update our persistent state using the `Snapshot`.
         self.process_info.update(&new);
         self.system_info.update(&new);
     }
@@ -60,24 +59,25 @@ impl Ingester {
     }
 }
 
-struct Config {
-    user_hz: u32,
+struct Handles {
     meminfo: File,
     swaps: File,
     stat: File,
 }
-impl Default for Config {
+impl Default for Handles {
     fn default() -> Self {
+        let user_hz: u32 = {
+            let output = Command::new("getconf").arg("CLK_TCK").output().unwrap();
+            assert!(output.status.success());
+            std::str::from_utf8(&output.stdout)
+                .unwrap()
+                .trim()
+                .parse()
+                .unwrap()
+        };
+        assert_eq!(user_hz, 100);
+
         Self {
-            user_hz: {
-                let output = Command::new("getconf").arg("CLK_TCK").output().unwrap();
-                assert!(output.status.success());
-                std::str::from_utf8(&output.stdout)
-                    .unwrap()
-                    .trim()
-                    .parse()
-                    .unwrap()
-            },
             meminfo: File::open("/proc/meminfo").unwrap(),
             swaps: File::open("/proc/swaps").unwrap(),
             stat: File::open("/proc/stat").unwrap(),
