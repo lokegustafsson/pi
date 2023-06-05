@@ -184,6 +184,7 @@ impl FromStr for DiskStats {
 #[derive(Clone, Debug)]
 pub struct MemInfo {
     pub mem_total: u64,
+    pub mem_free: u64,
     pub mem_available: u64,
     pub swap_total: u64,
     pub swap_free: u64,
@@ -206,12 +207,14 @@ impl FromStr for MemInfo {
         }
         let mut ret = MemInfo {
             mem_total: 0,
+            mem_free: 0,
             mem_available: 0,
             swap_total: 0,
             swap_free: 0,
         };
         let l = s.lines();
         let l = extract(l, &mut ret.mem_total, "MemTotal:");
+        let l = extract(l, &mut ret.mem_free, "MemFree:");
         let l = extract(l, &mut ret.mem_available, "MemAvailable:");
         let l = extract(l, &mut ret.swap_total, "SwapTotal:");
         let l = extract(l, &mut ret.swap_free, "SwapFree:");

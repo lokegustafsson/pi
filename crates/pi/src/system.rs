@@ -125,6 +125,12 @@ impl Component for SystemTab {
                     kind: TimeSeriesKind::Primary,
                 }
                 .render(ui, &info.total_cpu.total);
+                TimeSeries {
+                    name: "CPU TEMP",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &info.global.cpu_max_temp);
                 Grid::new("cpu-grid").num_columns(long_side).show(ui, |ui| {
                     for i in 0..cpus {
                         TimeSeries {
@@ -144,15 +150,64 @@ impl Component for SystemTab {
             SystemNavigation::Ram => {
                 ui.heading("RAM View");
                 TimeSeries {
-                    name: "RAM",
+                    name: "RAM USED",
                     max_y: info.global.mem_total as f64,
                     kind: TimeSeriesKind::Primary,
                 }
                 .render(ui, &info.global.mem_used);
+                TimeSeries {
+                    name: "RAM RECLAIMABLE",
+                    max_y: info.global.mem_total as f64,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &info.global.mem_reclaimable);
             }
-            SystemNavigation::Disk => todo!(),
-            SystemNavigation::Net => todo!(),
-            SystemNavigation::Gpu => todo!(),
+            SystemNavigation::Disk => {
+                ui.heading("DISK View");
+                TimeSeries {
+                    name: "DISK READ",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &info.total_partition.read);
+                TimeSeries {
+                    name: "DISK WRITE",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &info.total_partition.written);
+                TimeSeries {
+                    name: "DISK DISCARD",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &info.total_partition.discarded);
+            }
+            SystemNavigation::Net => {
+                ui.heading("NET View");
+                TimeSeries {
+                    name: "NET RX",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &info.total_net.rx);
+
+                TimeSeries {
+                    name: "NET TX",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &info.total_net.tx);
+            }
+            SystemNavigation::Gpu => {
+                ui.heading("GPU View");
+                TimeSeries {
+                    name: "GPU",
+                    max_y: info.by_gpu.len() as f64,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &info.total_gpu.gpu_busy);
+            }
         });
     }
 }

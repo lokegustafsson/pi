@@ -20,6 +20,7 @@ pub struct SystemInfo {
 pub struct GlobalInfo {
     pub mem_total: f64,
     pub swap_total: f64,
+    pub mem_reclaimable: Series<f64>,
     pub mem_used: Series<f64>,
     pub swap_used: Series<f64>,
     pub cpu_max_temp: Series<f64>,
@@ -97,6 +98,8 @@ impl GlobalInfo {
     fn update(&mut self, new: &Snapshot) {
         self.mem_total = 1024.0 * new.mem_info.mem_total as f64;
         self.swap_total = 1024.0 * new.mem_info.swap_total as f64;
+        self.mem_reclaimable
+            .push(1024.0 * (new.mem_info.mem_available - new.mem_info.mem_free) as f64);
         self.mem_used
             .push(1024.0 * (new.mem_info.mem_total - new.mem_info.mem_available) as f64);
         self.swap_used
