@@ -13,10 +13,25 @@ use std::{
 pub struct Snapshot {
     pub disk_stats: Vec<DiskStats>,
     pub mem_info: MemInfo,
-    pub mounts: Mounts,
+    pub partition_to_mountpath: PartitionToMountpath,
     pub cpus_stat: Vec<CpuStat>,
     pub uptime: Uptime,
     pub cpu_max_temp_millicelsius: u32,
+    pub by_net_interface: BTreeMap<String, NetInterfaceSnapshot>,
+    pub by_gpu: BTreeMap<String, GpuSnapshot>,
+}
+#[derive(Clone, Debug)]
+pub struct NetInterfaceSnapshot {
+    pub rx_bytes: u64,
+    pub tx_bytes: u64,
+}
+#[derive(Clone, Debug)]
+pub struct GpuSnapshot {
+    pub mem_info_vram_used: u64,
+    pub mem_info_vram_total: u64,
+    pub mem_busy_percent: u16,
+    pub gpu_busy_percent: u16,
+    pub temperatures: u32,
 }
 impl Snapshot {
     pub(crate) fn new(scratch_buf: &mut String, handles: &mut Handles) -> Self {
@@ -51,7 +66,7 @@ impl Snapshot {
         Snapshot {
             disk_stats,
             mem_info: parse(&mut handles.meminfo, scratch_buf),
-            mounts: parse(&mut handles.mounts, scratch_buf),
+            partition_to_mountpath: parse(&mut handles.mounts, scratch_buf),
             cpus_stat,
             uptime: parse(&mut handles.uptime, scratch_buf),
             cpu_max_temp_millicelsius: {
@@ -61,6 +76,41 @@ impl Snapshot {
                 }
                 ret
             },
+            by_net_interface: handles
+                .by_net_interface
+                .iter_mut()
+                .map(|(name, interface)| {
+                    (
+                        name.to_owned(),
+                        NetInterfaceSnapshot {
+                            rx_bytes: parse(&mut interface.rx_bytes, scratch_buf),
+                            tx_bytes: parse(&mut interface.tx_bytes, scratch_buf),
+                        },
+                    )
+                })
+                .collect(),
+            by_gpu: handles
+                .by_gpu
+                .iter_mut()
+                .map(|(name, gpu)| {
+                    (
+                        name.to_owned(),
+                        GpuSnapshot {
+                            mem_info_vram_used: parse(&mut gpu.mem_info_vram_used, scratch_buf),
+                            mem_info_vram_total: parse(&mut gpu.mem_info_vram_total, scratch_buf),
+                            mem_busy_percent: parse(&mut gpu.mem_busy_percent, scratch_buf),
+                            gpu_busy_percent: parse(&mut gpu.gpu_busy_percent, scratch_buf),
+                            temperatures: {
+                                let mut ret = 0;
+                                for temp in &mut gpu.temperatures {
+                                    ret = ret.max(parse(temp, scratch_buf));
+                                }
+                                ret
+                            },
+                        },
+                    )
+                })
+                .collect(),
         }
     }
 }
@@ -157,10 +207,10 @@ impl FromStr for MemInfo {
 }
 
 #[derive(Clone, Debug)]
-pub struct Mounts {
+pub struct PartitionToMountpath {
     partition_to_mountpath: BTreeMap<String, String>,
 }
-impl FromStr for Mounts {
+impl FromStr for PartitionToMountpath {
     type Err = Infallible;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut partition_to_mountpath = BTreeMap::new();

@@ -30,7 +30,7 @@ impl SystemInfoTickCpu {
     }
 }
 impl SystemInfo {
-    pub fn update(&mut self, new: &Snapshot) {
+    pub(crate) fn update(&mut self, new: &Snapshot) {
         while self.ticks.len() >= HISTORY {
             self.ticks.pop_front();
         }
