@@ -1,6 +1,6 @@
 use crate::{
     snapshot::{CpuStat, DiskStats, GpuSnapshot, NetInterfaceSnapshot, OldSnapshot, Snapshot},
-    Series,
+    Series, SUBSEC,
 };
 use std::{collections::BTreeMap, time::Duration};
 
@@ -24,6 +24,10 @@ pub struct GlobalInfo {
 }
 #[derive(Clone, Default, Debug)]
 pub struct CpuInfo {
+    recent_samples_total: WindowMovingAverage,
+    recent_samples_user: WindowMovingAverage,
+    recent_samples_system: WindowMovingAverage,
+    recent_samples_guest: WindowMovingAverage,
     pub total: Series<f64>,
     pub user: Series<f64>,
     pub system: Series<f64>,
@@ -102,10 +106,14 @@ impl CpuInfo {
         let guest = (new.guest - old.guest) as f64;
         let busy = user + system + guest;
         let total = if busy + idle > 0.0 { busy + idle } else { 1.0 };
-        self.total.push(busy / total);
-        self.user.push(user / total);
-        self.system.push(system / total);
-        self.guest.push(guest / total);
+        self.total
+            .push(self.recent_samples_total.add_sample(busy / total));
+        self.user
+            .push(self.recent_samples_user.add_sample(user / total));
+        self.system
+            .push(self.recent_samples_system.add_sample(system / total));
+        self.guest
+            .push(self.recent_samples_guest.add_sample(guest / total));
     }
     fn push_sum_of_others(&mut self, others: &[Self]) {
         self.total
@@ -185,5 +193,27 @@ fn intersect_old_new<'a, T: 'a, U: Default>(
         let old_v = &old[&k];
         let ret_slot = ret.entry(k.to_owned()).or_insert_with(Default::default);
         f(ret_slot, old_v, v);
+    }
+}
+
+#[derive(Clone, Debug)]
+struct WindowMovingAverage {
+    i: usize,
+    samples: [f64; Self::SMOOTHING_WINDOW],
+}
+impl WindowMovingAverage {
+    const SMOOTHING_WINDOW: usize = SUBSEC as usize;
+    fn add_sample(&mut self, sample: f64) -> f64 {
+        self.samples[self.i] = sample;
+        self.i = (self.i + 1) % Self::SMOOTHING_WINDOW;
+        self.samples.iter().copied().sum::<f64>() / Self::SMOOTHING_WINDOW as f64
+    }
+}
+impl Default for WindowMovingAverage {
+    fn default() -> Self {
+        Self {
+            i: 0,
+            samples: [0.0; Self::SMOOTHING_WINDOW],
+        }
     }
 }
