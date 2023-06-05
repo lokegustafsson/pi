@@ -13,7 +13,6 @@ pub struct SystemInfo {
 pub struct SystemInfoTick {
     pub mem_total: u64,
     pub mem_used: u64,
-    pub mem_cache: u64,
     pub swap_total: u64,
     pub swap_used: u64,
     pub avg_cpu: SystemInfoTickCpu,
@@ -64,7 +63,6 @@ impl SystemInfoTick {
         Self {
             mem_total: 1024 * new.mem_info.mem_total,
             mem_used: 1024 * (new.mem_info.mem_total - new.mem_info.mem_available),
-            mem_cache: 1024 * (new.mem_info.cached + new.mem_info.swap_cached),
             swap_total: 1024 * new.mem_info.swap_total,
             swap_used: 1024 * (new.mem_info.swap_total - new.mem_info.swap_free),
             avg_cpu: cpu(&old_cpus_stat[0], &new.cpus_stat[0], num_cpu),

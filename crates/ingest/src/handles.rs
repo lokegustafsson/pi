@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet},
+    collections::{hash_map::DefaultHasher, BTreeMap},
     ffi::OsString,
     fs::{self, DirEntry, File},
     hash::{Hash, Hasher},
@@ -15,7 +15,7 @@ use std::{
 /// Also
 /// - `/sys/class/hwmon/*/name`
 pub struct Handles {
-    /// `/proc/diststats`
+    /// `/proc/diskstats`
     pub diskstats: File,
     /// `/proc/meminfo`
     pub meminfo: File,
@@ -23,8 +23,6 @@ pub struct Handles {
     pub mounts: File,
     /// `/proc/stat`
     pub stat: File,
-    /// `/proc/swaps`
-    pub swaps: File,
     /// `/proc/uptime`
     pub uptime: File,
 
@@ -32,7 +30,6 @@ pub struct Handles {
     pub cpu_temperatures: Vec<File>,
 
     pub by_net_interface: BTreeMap<String, NetInterfaceHandles>,
-    pub by_disk: BTreeMap<String, DiskHandles>,
     pub by_gpu: BTreeMap<String, GpuHandles>,
 
     /// Used to regenerate `Handles` if the environment has changed (e.g. new disk)
@@ -43,17 +40,6 @@ pub struct NetInterfaceHandles {
     pub rx_bytes: File,
     /// `/sys/class/net/{interface}/statistics/tx_bytes`
     pub tx_bytes: File,
-}
-/// `/sys/block` contains disks
-/// `/sys/class/block` contains disks and partitions
-pub struct DiskHandles {
-    /// `/sys/block/{disk}/stat`
-    pub stat: File,
-    pub partitions: BTreeMap<String, DiskPartitionHandles>,
-}
-pub struct DiskPartitionHandles {
-    /// `/sys/block/{disk}/{partition}/stat`
-    pub stat: File,
 }
 pub struct GpuHandles {
     /// `/sys/class/drm/{gpu}/device/mem_info_vram_used`
@@ -87,7 +73,6 @@ impl Handles {
             meminfo: File::open("/proc/meminfo").unwrap(),
             mounts: File::open("/proc/mounts").unwrap(),
             stat: File::open("/proc/stat").unwrap(),
-            swaps: File::open("/proc/swaps").unwrap(),
             uptime: File::open("/proc/uptime").unwrap(),
 
             cpu_temperatures: {
@@ -115,37 +100,6 @@ impl Handles {
                     )
                 })
                 .collect(),
-            by_disk: {
-                let block_device_names: BTreeSet<OsString> = read_dir("/sys/class/block")
-                    .map(|block_device| block_device.file_name())
-                    .collect();
-                read_dir("/sys/block")
-                    .filter(|disk| !disk.file_name().into_string().unwrap().starts_with("loop"))
-                    .map(|disk| {
-                        let disk_path = disk.path();
-                        (
-                            disk.file_name().into_string().unwrap(),
-                            DiskHandles {
-                                stat: File::open(disk_path.join("stat")).unwrap(),
-                                partitions: read_dir(disk_path)
-                                    .filter(|partition| {
-                                        block_device_names.contains(&partition.file_name())
-                                    })
-                                    .map(|partition| {
-                                        (
-                                            partition.file_name().into_string().unwrap(),
-                                            DiskPartitionHandles {
-                                                stat: File::open(partition.path().join("stat"))
-                                                    .unwrap(),
-                                            },
-                                        )
-                                    })
-                                    .collect(),
-                            },
-                        )
-                    })
-                    .collect()
-            },
             by_gpu: read_dir("/sys/class/drm")
                 .filter(|drm| {
                     let drm_name = drm.file_name().into_string().unwrap();
