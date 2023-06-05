@@ -22,15 +22,16 @@ pub struct GlobalInfo {
     pub swap_total: f64,
     pub mem_used: Series<f64>,
     pub swap_used: Series<f64>,
+    pub cpu_max_temp: Series<f64>,
     pub uptime: Duration,
     pub uptime_cpu_busy: Duration,
 }
 #[derive(Clone, Default, Debug)]
 pub struct CpuInfo {
-    recent_samples_total: WindowMovingAverage,
-    recent_samples_user: WindowMovingAverage,
-    recent_samples_system: WindowMovingAverage,
-    recent_samples_guest: WindowMovingAverage,
+    wma_total: WindowMovingAverage,
+    wma_user: WindowMovingAverage,
+    wma_system: WindowMovingAverage,
+    wma_guest: WindowMovingAverage,
     pub total: Series<f64>,
     pub user: Series<f64>,
     pub system: Series<f64>,
@@ -46,11 +47,14 @@ pub struct PartitionInfo {
 }
 #[derive(Default, Debug)]
 pub struct NetInterfaceInfo {
+    wma_rx: WindowMovingAverage,
+    wma_tx: WindowMovingAverage,
     pub rx: Series<f64>,
     pub tx: Series<f64>,
 }
 #[derive(Default, Debug)]
 pub struct GpuInfo {
+    wma_gpu_busy: WindowMovingAverage,
     pub vram_total: f64,
     pub vram_used: Series<f64>,
     pub vram_busy: Series<f64>,
@@ -97,6 +101,8 @@ impl GlobalInfo {
             .push(1024.0 * (new.mem_info.mem_total - new.mem_info.mem_available) as f64);
         self.swap_used
             .push(1024.0 * (new.mem_info.swap_total - new.mem_info.swap_free) as f64);
+        self.cpu_max_temp
+            .push(new.cpu_max_temp_millicelsius as f64 / 1e3);
         self.uptime = new.uptime.since_boot;
         self.uptime_cpu_busy =
             new.uptime.since_boot - new.uptime.idle_cpu_since_boot / new.cpus_stat.len() as u32;
@@ -116,14 +122,10 @@ impl CpuInfo {
         let guest = (new.guest - old.guest) as f64;
         let busy = user + system + guest;
         let total = if busy + idle > 0.0 { busy + idle } else { 1.0 };
-        self.total
-            .push(self.recent_samples_total.add_sample(busy / total));
-        self.user
-            .push(self.recent_samples_user.add_sample(user / total));
-        self.system
-            .push(self.recent_samples_system.add_sample(system / total));
-        self.guest
-            .push(self.recent_samples_guest.add_sample(guest / total));
+        self.total.push(self.wma_total.add_sample(busy / total));
+        self.user.push(self.wma_user.add_sample(user / total));
+        self.system.push(self.wma_system.add_sample(system / total));
+        self.guest.push(self.wma_guest.add_sample(guest / total));
     }
     fn push_sum_of_others(&mut self, others: &[Self]) {
         let mut total = 0.0;
@@ -201,8 +203,10 @@ impl PartitionInfo {
 }
 impl NetInterfaceInfo {
     fn update(&mut self, old: &NetInterfaceSnapshot, new: &NetInterfaceSnapshot) {
-        self.rx.push((new.rx_bytes - old.rx_bytes) as f64);
-        self.tx.push((new.tx_bytes - old.tx_bytes) as f64);
+        self.rx
+            .push(self.wma_rx.add_sample((new.rx_bytes - old.rx_bytes) as f64));
+        self.tx
+            .push(self.wma_tx.add_sample((new.tx_bytes - old.tx_bytes) as f64));
     }
     fn push_sum_of_others<'a>(&mut self, others: impl Iterator<Item = &'a Self>) {
         let mut rx = 0.0;
@@ -220,8 +224,11 @@ impl GpuInfo {
         self.vram_total = new.mem_info_vram_total as f64;
         self.vram_used.push(new.mem_info_vram_used as f64);
         self.vram_busy.push(new.mem_busy_percent as f64 / 100.0);
-        self.gpu_busy.push(new.gpu_busy_percent as f64 / 100.0);
-        self.max_temperature.push(new.max_temperature as f64);
+        self.gpu_busy.push(
+            self.wma_gpu_busy
+                .add_sample(new.gpu_busy_percent as f64 / 100.0),
+        );
+        self.max_temperature.push(new.max_temperature as f64 / 1e3);
     }
     fn push_sum_of_others<'a>(&mut self, others: impl Iterator<Item = &'a Self>) {
         self.vram_total = 0.0;

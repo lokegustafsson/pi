@@ -36,6 +36,7 @@ impl Component for SystemTab {
                 &[
                     &format!("{:.2}/{}", total_cpu, num_cpu),
                     &format!("({:.0}%)", 100.0 * total_cpu / (num_cpu as f64)),
+                    &format!("{:.0}C", info.global.cpu_max_temp.latest()),
                 ],
                 nav,
                 SystemNavigation::Cpu,
