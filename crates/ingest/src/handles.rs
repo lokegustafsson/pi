@@ -69,11 +69,11 @@ impl Handles {
         Self {
             environment_hash: Self::hash_environment(),
 
-            diskstats: File::open("/proc/diskstats").unwrap(),
-            meminfo: File::open("/proc/meminfo").unwrap(),
-            mounts: File::open("/proc/mounts").unwrap(),
-            stat: File::open("/proc/stat").unwrap(),
-            uptime: File::open("/proc/uptime").unwrap(),
+            diskstats: open("/proc/diskstats"),
+            meminfo: open("/proc/meminfo"),
+            mounts: open("/proc/mounts"),
+            stat: open("/proc/stat"),
+            uptime: open("/proc/uptime"),
 
             cpu_temperatures: {
                 let mut ret = Vec::new();
@@ -92,10 +92,8 @@ impl Handles {
                     (
                         interface_name,
                         NetInterfaceHandles {
-                            rx_bytes: File::open(interface.path().join("statistics/rx_bytes"))
-                                .unwrap(),
-                            tx_bytes: File::open(interface.path().join("statistics/tx_bytes"))
-                                .unwrap(),
+                            rx_bytes: open(interface.path().join("statistics/rx_bytes")),
+                            tx_bytes: open(interface.path().join("statistics/tx_bytes")),
                         },
                     )
                 })
@@ -121,12 +119,10 @@ impl Handles {
                     (
                         drm.file_name().into_string().unwrap(),
                         GpuHandles {
-                            mem_info_vram_used: File::open(device.join("mem_info_vram_used"))
-                                .unwrap(),
-                            mem_info_vram_total: File::open(device.join("mem_info_vram_total"))
-                                .unwrap(),
-                            mem_busy_percent: File::open(device.join("mem_busy_percent")).unwrap(),
-                            gpu_busy_percent: File::open(device.join("gpu_busy_percent")).unwrap(),
+                            mem_info_vram_used: open(device.join("mem_info_vram_used")),
+                            mem_info_vram_total: open(device.join("mem_info_vram_total")),
+                            mem_busy_percent: open(device.join("mem_busy_percent")),
+                            gpu_busy_percent: open(device.join("gpu_busy_percent")),
                             temperatures: hwmon_get_temps(&device.join("hwmon/hwmon0")),
                         },
                     )
@@ -163,8 +159,12 @@ fn hwmon_get_temps(path: &Path) -> Vec<File> {
     read_dir(path)
         .filter_map(|entry| {
             let name = entry.file_name().into_string().unwrap();
-            (name.starts_with("temp") && name.starts_with("_input"))
-                .then(|| File::open(entry.path()).unwrap())
+            (name.starts_with("temp") && name.starts_with("_input")).then(|| open(entry.path()))
         })
         .collect()
+}
+fn open(path: impl AsRef<Path>) -> File {
+    let path = path.as_ref();
+    tracing::info!(?path, "Opening");
+    File::open(path).unwrap()
 }

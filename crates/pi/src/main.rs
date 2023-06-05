@@ -7,12 +7,24 @@ use crate::{
 };
 use eframe::egui::{self, Ui};
 use ingest::Ingester;
+use tracing_subscriber::Layer;
 
 mod process;
 mod system;
 
 fn main() -> Result<(), eframe::Error> {
-    tracing_subscriber::fmt::init();
+    tracing::subscriber::set_global_default(
+        tracing_subscriber::filter::targets::Targets::new()
+            .with_target("eframe::native::run", tracing::Level::INFO)
+            .with_target("egui_glow", tracing::Level::INFO)
+            .with_default(tracing::Level::TRACE)
+            .with_subscriber(
+                tracing_subscriber::FmtSubscriber::builder()
+                    .with_max_level(tracing::Level::TRACE)
+                    .finish(),
+            ),
+    )
+    .expect("enabling global logger");
 
     eframe::run_native(
         "pi: process information",
