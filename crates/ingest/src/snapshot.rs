@@ -31,9 +31,22 @@ pub struct GpuSnapshot {
     pub mem_info_vram_total: u64,
     pub mem_busy_percent: u16,
     pub gpu_busy_percent: u16,
-    pub temperatures: u32,
+    pub max_temperature: u32,
+}
+#[derive(Clone, Debug)]
+pub struct OldSnapshot {
+    pub disk_stats: Vec<DiskStats>,
+    pub cpus_stat: Vec<CpuStat>,
+    pub by_net_interface: BTreeMap<String, NetInterfaceSnapshot>,
 }
 impl Snapshot {
+    pub fn retire(self) -> OldSnapshot {
+        OldSnapshot {
+            disk_stats: self.disk_stats,
+            cpus_stat: self.cpus_stat,
+            by_net_interface: self.by_net_interface,
+        }
+    }
     pub(crate) fn new(scratch_buf: &mut String, handles: &mut Handles) -> Self {
         fn parse<F: FromStr>(file: &mut File, scratch_buf: &mut String) -> F
         where
@@ -58,6 +71,7 @@ impl Snapshot {
         let cpus_stat = scratch_buf
             .lines()
             .take_while(|line| line.starts_with("cpu"))
+            .skip_while(|line| line.starts_with("cpu "))
             .map(|line| line.parse().unwrap())
             .collect();
         scratch_buf.clear();
@@ -100,7 +114,7 @@ impl Snapshot {
                             mem_info_vram_total: parse(&mut gpu.mem_info_vram_total, scratch_buf),
                             mem_busy_percent: parse(&mut gpu.mem_busy_percent, scratch_buf),
                             gpu_busy_percent: parse(&mut gpu.gpu_busy_percent, scratch_buf),
-                            temperatures: {
+                            max_temperature: {
                                 let mut ret = 0;
                                 for temp in &mut gpu.temperatures {
                                     ret = ret.max(parse(temp, scratch_buf));
@@ -118,22 +132,22 @@ impl Snapshot {
 #[derive(Clone, Debug)]
 pub struct DiskStats {
     major_device_number: u16,
-    minor_device_number: u16,
-    device_name: String,
+    pub minor_device_number: u16,
+    pub device_name: String,
     reads_completed: u64,
     reads_merged: u64,
-    sectors_read: u64,
+    pub sectors_read: u64,
     time_spent_reading: Duration,
     writes_completed: u64,
     writes_merged: u64,
-    sectors_written: u64,
+    pub sectors_written: u64,
     time_spent_writing: Duration,
     io_currently_in_progress: u32,
     time_spent_io: Duration,
     weighted_time_spent_io: Duration,
     discards_completed: u64,
     discards_merged: u64,
-    sectors_discarded: u64,
+    pub sectors_discarded: u64,
     time_spent_discarding: Duration,
     flush_requests_completed: u64,
     time_spent_flushing: Duration,
@@ -208,7 +222,7 @@ impl FromStr for MemInfo {
 
 #[derive(Clone, Debug)]
 pub struct PartitionToMountpath {
-    partition_to_mountpath: BTreeMap<String, String>,
+    pub partition_to_mountpath: BTreeMap<String, String>,
 }
 impl FromStr for PartitionToMountpath {
     type Err = Infallible;
@@ -271,8 +285,8 @@ impl FromStr for CpuStat {
 
 #[derive(Clone, Debug)]
 pub struct Uptime {
-    since_boot: Duration,
-    idle_cpu_since_boot: Duration,
+    pub since_boot: Duration,
+    pub idle_cpu_since_boot: Duration,
 }
 impl FromStr for Uptime {
     type Err = Infallible;

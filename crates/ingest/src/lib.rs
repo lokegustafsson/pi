@@ -1,5 +1,11 @@
-use crate::{handles::Handles, snapshot::Snapshot};
-use std::time::{Duration, Instant};
+use crate::{
+    handles::Handles,
+    snapshot::{OldSnapshot, Snapshot},
+};
+use std::{
+    collections::VecDeque,
+    time::{Duration, Instant},
+};
 
 mod handles;
 mod process;
@@ -7,7 +13,7 @@ mod snapshot;
 mod system;
 
 pub use process::ProcessInfo;
-pub use system::{SystemInfo, SystemInfoTick};
+pub use system::SystemInfo;
 
 const SUBSEC: u64 = 60;
 pub const TICK_DELAY: Duration = Duration::from_micros(1_000_000 / SUBSEC);
@@ -17,15 +23,20 @@ pub struct Ingester {
     handles: Handles,
     next_update_instant: Instant,
     scratch_buf: String,
+    old_snapshot: OldSnapshot,
     process_info: ProcessInfo,
     system_info: SystemInfo,
 }
 impl Ingester {
     pub fn new() -> Self {
+        let mut handles = Handles::new();
+        let mut scratch_buf = String::new();
+        let old_snapshot = Snapshot::new(&mut scratch_buf, &mut handles).retire();
         Self {
-            handles: Handles::new(),
+            handles,
             next_update_instant: Instant::now(),
-            scratch_buf: String::new(),
+            scratch_buf,
+            old_snapshot,
             process_info: ProcessInfo::default(),
             system_info: SystemInfo::default(),
         }
@@ -48,13 +59,36 @@ impl Ingester {
         let new = Snapshot::new(&mut self.scratch_buf, &mut self.handles);
 
         // We then update our persistent state using the `Snapshot`.
-        self.process_info.update(&new);
-        self.system_info.update(&new);
+        self.process_info.update(&new, &self.old_snapshot);
+        self.system_info.update(&new, &self.old_snapshot);
+        self.old_snapshot = new.retire();
     }
     pub fn process_info(&self) -> &ProcessInfo {
         &self.process_info
     }
     pub fn system_info(&self) -> &SystemInfo {
         &self.system_info
+    }
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct Series<T: Copy + Default> {
+    inner: VecDeque<T>,
+}
+impl<T: Copy + Default> Series<T> {
+    fn push(&mut self, item: T) {
+        while self.inner.len() >= HISTORY {
+            self.inner.pop_front();
+        }
+        self.inner.push_back(item);
+    }
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+    pub fn latest(&self) -> T {
+        *self.inner.back().unwrap()
+    }
+    pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, T> {
+        self.inner.iter()
     }
 }
