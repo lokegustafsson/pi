@@ -2,7 +2,7 @@ use crate::Component;
 use eframe::egui::{
     self,
     plot::{Corner, Legend, Line, Plot, PlotPoints},
-    Frame, Grid, Label, Response, Sense, Ui,
+    Align, Frame, Grid, Label, Layout, Response, Sense, Ui, Vec2,
 };
 use ingest::{Series, SystemInfo, HISTORY, TICK_DELAY};
 
@@ -11,48 +11,106 @@ pub struct SystemTab;
 pub enum SystemNavigation {
     Cpu,
     Ram,
+    Disk,
+    Net,
+    Gpu,
 }
 impl Component for SystemTab {
     type Navigation = SystemNavigation;
     type Info = SystemInfo;
     fn render(ui: &mut Ui, nav: &mut SystemNavigation, info: &SystemInfo) {
         ui.heading("System view");
-        egui::SidePanel::left("system-left-panel")
-            .max_width(1.0)
-            .show_inside(ui, |ui| {
-                let total_cpu = info.total_cpu.total.latest();
-                let num_cpu = info.by_cpu.len();
-                let mem_used = info.global.mem_used.latest() as f64;
-                let mem_total = info.global.mem_total as f64;
-                left_panel_item(
-                    ui,
-                    "CPU",
-                    &[
-                        &format!("{:.2}/{}", total_cpu, num_cpu),
-                        &format!("({:.0}%)", 100.0 * total_cpu / (num_cpu as f64)),
-                    ],
-                    nav,
-                    SystemNavigation::Cpu,
-                    &info.total_cpu.total,
-                    num_cpu as f64,
-                );
-                left_panel_item(
-                    ui,
-                    "RAM",
-                    &[
-                        &format!(
-                            "{:.0}/{:.0}GiB",
-                            mem_used / 2.0f64.powi(30),
-                            mem_total / 2.0f64.powi(30),
-                        ),
-                        &format!("({:.0}%)", 100.0 * mem_used / mem_total),
-                    ],
-                    nav,
-                    SystemNavigation::Ram,
-                    &info.global.mem_used,
-                    mem_total,
-                );
-            });
+        egui::SidePanel::left("system-left-panel").show_inside(ui, |ui| {
+            let total_cpu = info.total_cpu.total.latest();
+            let num_cpu = info.by_cpu.len();
+            let mem_used = info.global.mem_used.latest();
+            let size = {
+                let mut ret = ui.available_size();
+                ret.y /= 5.0;
+                ret
+            };
+            left_panel_item(
+                ui,
+                size,
+                "CPU",
+                &[
+                    &format!("{:.2}/{}", total_cpu, num_cpu),
+                    &format!("({:.0}%)", 100.0 * total_cpu / (num_cpu as f64)),
+                ],
+                nav,
+                SystemNavigation::Cpu,
+                &info.total_cpu.total,
+                num_cpu as f64,
+            );
+            left_panel_item(
+                ui,
+                size,
+                "RAM",
+                &[
+                    &format!(
+                        "{:.0}/{:.0}GiB",
+                        mem_used / 2.0f64.powi(30),
+                        info.global.mem_total / 2.0f64.powi(30),
+                    ),
+                    &format!("({:.0}%)", 100.0 * mem_used / info.global.mem_total),
+                ],
+                nav,
+                SystemNavigation::Ram,
+                &info.global.mem_used,
+                info.global.mem_total,
+            );
+            left_panel_item(
+                ui,
+                size,
+                "DISK",
+                &[
+                    &format!(
+                        "{:.0}/{:.0}GiB",
+                        info.total_partition.used / 2.0f64.powi(30),
+                        info.total_partition.capacity / 2.0f64.powi(30),
+                    ),
+                    &format!("Read {:.0}B/s", info.total_partition.read.latest()),
+                    &format!("Write {:.0}B/s", info.total_partition.written.latest()),
+                    &format!("Discard {:.0}B/s", info.total_partition.discarded.latest()),
+                ],
+                nav,
+                SystemNavigation::Disk,
+                &info.total_partition.read,
+                f64::INFINITY,
+            );
+            left_panel_item(
+                ui,
+                size,
+                "NET",
+                &[
+                    &format!("RX {:.0}B/s", info.total_net.rx.latest()),
+                    &format!("TX {:.0}B/s", info.total_net.tx.latest()),
+                ],
+                nav,
+                SystemNavigation::Net,
+                &info.total_net.rx,
+                f64::INFINITY,
+            );
+            left_panel_item(
+                ui,
+                size,
+                "GPU",
+                &[
+                    &format!(
+                        "{:.0}/{:.0}GiB",
+                        info.total_gpu.vram_used.latest() / 2.0f64.powi(30),
+                        info.total_gpu.vram_total / 2.0f64.powi(30),
+                    ),
+                    &format!("Mem {:.0}%", 100.0 * info.total_gpu.vram_busy.latest()),
+                    &format!("{:.0}%", 100.0 * info.total_gpu.gpu_busy.latest()),
+                    &format!("{:.0}C", info.total_gpu.max_temperature.latest()),
+                ],
+                nav,
+                SystemNavigation::Gpu,
+                &info.total_gpu.gpu_busy,
+                info.by_gpu.len() as f64,
+            );
+        });
         egui::ScrollArea::vertical().show(ui, |ui| match nav {
             SystemNavigation::Cpu => {
                 let cpus = info.by_cpu.len();
@@ -91,12 +149,16 @@ impl Component for SystemTab {
                 }
                 .render(ui, &info.global.mem_used);
             }
+            SystemNavigation::Disk => todo!(),
+            SystemNavigation::Net => todo!(),
+            SystemNavigation::Gpu => todo!(),
         });
     }
 }
 
 fn left_panel_item(
     ui: &mut Ui,
+    size: Vec2,
     label: &'static str,
     sublabels: &[&str],
     nav: &mut SystemNavigation,
@@ -105,45 +167,46 @@ fn left_panel_item(
     max_y: f64,
 ) {
     let selected = *nav == value;
-    if ui
+    let resp = ui
         .push_id(label, |ui| {
-            Frame::none()
-                .inner_margin(6.0)
-                .fill({
-                    let visuals = ui.visuals();
-                    match selected {
-                        true => visuals.selection.bg_fill,
-                        false => visuals.window_fill,
-                    }
-                })
-                .show(ui, |ui| {
-                    if selected {
-                        let mut v = ui.visuals_mut();
-                        v.override_text_color = Some(v.selection.stroke.color);
-                    }
-                    ui.horizontal(|ui| {
-                        TimeSeries {
-                            name: label,
-                            max_y,
-                            kind: TimeSeriesKind::Preview,
+            ui.allocate_ui(size, |ui| {
+                Frame::none()
+                    .inner_margin(6.0)
+                    .fill({
+                        let visuals = ui.visuals();
+                        match selected {
+                            true => visuals.selection.bg_fill,
+                            false => visuals.window_fill,
                         }
-                        .render(ui, series);
-                        ui.horizontal_centered(|ui| {
-                            ui.vertical(|ui| {
-                                ui.add(Label::new(label).wrap(false));
-                                for text in sublabels {
-                                    ui.add(Label::new(*text).wrap(false));
-                                }
-                            })
-                        });
-                        ui.allocate_space(ui.available_size())
                     })
-                });
+                    .show(ui, |ui| {
+                        if selected {
+                            let mut v = ui.visuals_mut();
+                            v.override_text_color = Some(v.selection.stroke.color);
+                        }
+                        ui.allocate_ui_with_layout(
+                            ui.available_size(),
+                            Layout::right_to_left(Align::Center),
+                            |ui| {
+                                ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
+                                    ui.add(Label::new(label).wrap(false));
+                                    for text in sublabels {
+                                        ui.add(Label::new(*text).wrap(false));
+                                    }
+                                });
+                                TimeSeries {
+                                    name: label,
+                                    max_y,
+                                    kind: TimeSeriesKind::Preview,
+                                }
+                                .render(ui, series);
+                            },
+                        )
+                    });
+            })
         })
-        .response
-        .interact(Sense::click())
-        .clicked()
-    {
+        .response;
+    if resp.interact(Sense::click()).clicked() {
         *nav = value;
     }
 }
