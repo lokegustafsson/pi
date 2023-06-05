@@ -26,7 +26,7 @@ impl Snapshot {
         {
             file.read_to_string(scratch_buf).unwrap();
             file.rewind().unwrap();
-            let ret = scratch_buf.parse().unwrap();
+            let ret = scratch_buf.trim().parse().unwrap();
             scratch_buf.clear();
             ret
         }

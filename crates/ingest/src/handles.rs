@@ -79,7 +79,7 @@ impl Handles {
                 let mut ret = Vec::new();
                 for hwmon in read_dir("/sys/class/hwmon") {
                     let path = hwmon.path();
-                    if fs::read_to_string(path.join("name")).unwrap() == "k10-temp" {
+                    if fs::read_to_string(path.join("name")).unwrap() == "k10temp\n" {
                         ret.extend(hwmon_get_temps(&path));
                     }
                 }
@@ -159,12 +159,12 @@ fn hwmon_get_temps(path: &Path) -> Vec<File> {
     read_dir(path)
         .filter_map(|entry| {
             let name = entry.file_name().into_string().unwrap();
-            (name.starts_with("temp") && name.starts_with("_input")).then(|| open(entry.path()))
+            (name.starts_with("temp") && name.ends_with("_input")).then(|| open(entry.path()))
         })
         .collect()
 }
 fn open(path: impl AsRef<Path>) -> File {
     let path = path.as_ref();
-    tracing::info!(?path, "Opening");
+    tracing::info!(?path, "opening");
     File::open(path).unwrap()
 }
