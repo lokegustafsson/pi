@@ -2,7 +2,7 @@ use crate::{show::Show, Component};
 use eframe::egui::{
     self,
     plot::{Corner, Legend, Line, Plot, PlotPoints},
-    Align, Frame, Grid, Label, Layout, Response, Sense, Ui, Vec2,
+    Align, Frame, Grid, Label, Layout, Sense, Ui, Vec2,
 };
 use ingest::{Series, SystemInfo, HISTORY, TICK_DELAY};
 
@@ -42,7 +42,7 @@ impl Component for SystemTab {
                 ],
                 nav,
                 SystemNavigation::Cpu,
-                &info.total_cpu.total,
+                &[("", &info.total_cpu.total)],
                 num_cpu as f64,
             );
             left_panel_item(
@@ -55,7 +55,7 @@ impl Component for SystemTab {
                 ],
                 nav,
                 SystemNavigation::Ram,
-                &info.global.mem_used,
+                &[("", &info.global.mem_used)],
                 info.global.mem_total,
             );
             left_panel_item(
@@ -77,7 +77,10 @@ impl Component for SystemTab {
                 ],
                 nav,
                 SystemNavigation::Disk,
-                &info.total_partition.read,
+                &[
+                    ("READ", &info.total_partition.read),
+                    ("WRITE", &info.total_partition.written),
+                ],
                 f64::INFINITY,
             );
             left_panel_item(
@@ -90,7 +93,7 @@ impl Component for SystemTab {
                 ],
                 nav,
                 SystemNavigation::Net,
-                &info.total_net.rx,
+                &[("RX", &info.total_net.rx), ("TX", &info.total_net.tx)],
                 f64::INFINITY,
             );
             left_panel_item(
@@ -108,7 +111,7 @@ impl Component for SystemTab {
                 ],
                 nav,
                 SystemNavigation::Gpu,
-                &info.total_gpu.gpu_busy,
+                &[("", &info.total_gpu.gpu_busy)],
                 info.by_gpu.len() as f64,
             );
         });
@@ -124,13 +127,13 @@ impl Component for SystemTab {
                     max_y: cpus as f64,
                     kind: TimeSeriesKind::Primary,
                 }
-                .render(ui, &info.total_cpu.total);
+                .render(ui, &[("", &info.total_cpu.total)]);
                 TimeSeries {
                     name: "CPU TEMP",
                     max_y: f64::INFINITY,
                     kind: TimeSeriesKind::Primary,
                 }
-                .render(ui, &info.global.cpu_max_temp);
+                .render(ui, &[("", &info.global.cpu_max_temp)]);
                 Grid::new("cpu-grid").num_columns(long_side).show(ui, |ui| {
                     for i in 0..cpus {
                         TimeSeries {
@@ -140,7 +143,7 @@ impl Component for SystemTab {
                                 width: grid_cell_width,
                             },
                         }
-                        .render(ui, &info.by_cpu[i].total);
+                        .render(ui, &[("", &info.by_cpu[i].total)]);
                         if (i + 1) % long_side == 0 {
                             ui.end_row();
                         }
@@ -150,63 +153,72 @@ impl Component for SystemTab {
             SystemNavigation::Ram => {
                 ui.heading("RAM View");
                 TimeSeries {
-                    name: "RAM USED",
+                    name: "RAM",
                     max_y: info.global.mem_total as f64,
                     kind: TimeSeriesKind::Primary,
                 }
-                .render(ui, &info.global.mem_used);
-                TimeSeries {
-                    name: "RAM RECLAIMABLE",
-                    max_y: info.global.mem_total as f64,
-                    kind: TimeSeriesKind::Primary,
-                }
-                .render(ui, &info.global.mem_reclaimable);
+                .render(
+                    ui,
+                    &[
+                        ("USED", &info.global.mem_used),
+                        ("RECLAIMABLE", &info.global.mem_reclaimable),
+                    ],
+                );
             }
             SystemNavigation::Disk => {
                 ui.heading("DISK View");
                 TimeSeries {
-                    name: "DISK READ",
+                    name: "DISK",
                     max_y: f64::INFINITY,
                     kind: TimeSeriesKind::Primary,
                 }
-                .render(ui, &info.total_partition.read);
-                TimeSeries {
-                    name: "DISK WRITE",
-                    max_y: f64::INFINITY,
-                    kind: TimeSeriesKind::Primary,
-                }
-                .render(ui, &info.total_partition.written);
-                TimeSeries {
-                    name: "DISK DISCARD",
-                    max_y: f64::INFINITY,
-                    kind: TimeSeriesKind::Primary,
-                }
-                .render(ui, &info.total_partition.discarded);
+                .render(
+                    ui,
+                    &[
+                        ("READ", &info.total_partition.read),
+                        ("WRITE", &info.total_partition.written),
+                        ("DISCARD", &info.total_partition.discarded),
+                    ],
+                );
             }
             SystemNavigation::Net => {
                 ui.heading("NET View");
                 TimeSeries {
-                    name: "NET RX",
+                    name: "NET",
                     max_y: f64::INFINITY,
                     kind: TimeSeriesKind::Primary,
                 }
-                .render(ui, &info.total_net.rx);
-
-                TimeSeries {
-                    name: "NET TX",
-                    max_y: f64::INFINITY,
-                    kind: TimeSeriesKind::Primary,
-                }
-                .render(ui, &info.total_net.tx);
+                .render(
+                    ui,
+                    &[("RX", &info.total_net.rx), ("TX", &info.total_net.tx)],
+                );
             }
             SystemNavigation::Gpu => {
                 ui.heading("GPU View");
                 TimeSeries {
-                    name: "GPU",
+                    name: "GPU BUSY",
                     max_y: info.by_gpu.len() as f64,
                     kind: TimeSeriesKind::Primary,
                 }
-                .render(ui, &info.total_gpu.gpu_busy);
+                .render(
+                    ui,
+                    &[
+                        ("GPU BUSY", &info.total_gpu.gpu_busy),
+                        ("VRAM BUSY", &info.total_gpu.vram_busy),
+                    ],
+                );
+                TimeSeries {
+                    name: "GPU VRAM",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &[("VRAM", &info.total_gpu.vram_used)]);
+                TimeSeries {
+                    name: "GPU TEMP",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Primary,
+                }
+                .render(ui, &[("TEMP", &info.total_gpu.max_temperature)]);
             }
         });
     }
@@ -219,7 +231,7 @@ fn left_panel_item(
     sublabels: &[&str],
     nav: &mut SystemNavigation,
     value: SystemNavigation,
-    series: &Series<f64>,
+    series: &[(&str, &Series<f64>)],
     max_y: f64,
 ) {
     let selected = *nav == value;
@@ -279,19 +291,13 @@ enum TimeSeriesKind {
     GridCell { width: f32 },
 }
 impl<'a> TimeSeries<'a> {
-    fn render(&self, ui: &mut Ui, series: &Series<f64>) -> Response {
-        let points: PlotPoints = series
+    fn render(&self, ui: &mut Ui, series: &[(&str, &Series<f64>)]) {
+        let series_max_y = series
             .iter()
-            .enumerate()
-            .map(|(i, &y)| {
-                [
-                    (i as f64 - (series.len() - 1) as f64) * TICK_DELAY.as_secs_f64(),
-                    y,
-                ]
-            })
-            .collect();
-        let line = Line::new(points).name(self.name);
-        Plot::new(self.name)
+            .map(|(_, series)| series.iter().copied().max_by(f64::total_cmp).unwrap())
+            .reduce(f64::max)
+            .unwrap();
+        let mut plot = Plot::new(self.name)
             .view_aspect(match self.kind {
                 TimeSeriesKind::Preview | TimeSeriesKind::Primary => 1.6,
                 TimeSeriesKind::GridCell { .. } => 1.0,
@@ -307,13 +313,11 @@ impl<'a> TimeSeries<'a> {
             .show_y(false)
             .allow_zoom(false)
             .allow_scroll(false)
+            .allow_drag(false)
             .include_x(-((HISTORY - 1) as f64) * TICK_DELAY.as_secs_f64())
             .include_x(0)
             .include_y(0)
-            .include_y(
-                self.max_y
-                    .min(1.2 * series.iter().copied().max_by(f64::total_cmp).unwrap()),
-            )
+            .include_y(self.max_y.min(1.2 * series_max_y))
             .with_prop(
                 match self.kind {
                     TimeSeriesKind::Preview => None,
@@ -321,8 +325,22 @@ impl<'a> TimeSeries<'a> {
                 },
                 |plot, ()| plot.legend(Legend::default().position(Corner::LeftTop)),
             )
-            .show(ui, |ui| ui.line(line))
-            .response
+            .show(ui, |ui| {
+                for (name, series) in series {
+                    let points: PlotPoints = series
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &y)| {
+                            [
+                                (i as f64 - (series.len() - 1) as f64) * TICK_DELAY.as_secs_f64(),
+                                y,
+                            ]
+                        })
+                        .collect();
+                    ui.line(Line::new(points).name(name));
+                }
+            })
+            .response;
     }
 }
 
