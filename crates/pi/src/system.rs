@@ -87,8 +87,8 @@ impl Component for SystemTab {
                 nav,
                 SystemNavigation::Disk,
                 &[
-                    ("READ", &info.total_partition.read),
-                    ("WRITE", &info.total_partition.written),
+                    ("Read", &info.total_partition.read),
+                    ("Write", &info.total_partition.written),
                 ],
                 TimeSeries {
                     name: "DISK",
@@ -101,12 +101,15 @@ impl Component for SystemTab {
                 ui,
                 size,
                 &[
-                    &Show::rate(TICK_PER_SEC * info.total_net.wma_rx.get(), "RX "),
-                    &Show::rate(TICK_PER_SEC * info.total_net.wma_tx.get(), "TX "),
+                    &Show::rate(TICK_PER_SEC * info.total_net.wma_rx.get(), "Receive "),
+                    &Show::rate(TICK_PER_SEC * info.total_net.wma_tx.get(), "Transmit "),
                 ],
                 nav,
                 SystemNavigation::Net,
-                &[("RX", &info.total_net.rx), ("TX", &info.total_net.tx)],
+                &[
+                    ("Receive", &info.total_net.rx),
+                    ("Transmit", &info.total_net.tx),
+                ],
                 TimeSeries {
                     name: "NET",
                     max_y: f64::INFINITY,
@@ -122,8 +125,11 @@ impl Component for SystemTab {
                         info.total_gpu.vram_used.latest(),
                         info.total_gpu.vram_total,
                     ),
-                    &format!("Mem {:.0}%", 100.0 * info.total_gpu.vram_busy.latest()),
-                    &format!("{:.0}%", 100.0 * info.total_gpu.gpu_busy.latest()),
+                    &format!(
+                        "VRAM busy {:.0}%",
+                        100.0 * info.total_gpu.vram_busy.latest()
+                    ),
+                    &format!("GPU {:.0}%", 100.0 * info.total_gpu.gpu_busy.latest()),
                     &format!("{:.0}C", info.total_gpu.max_temperature.latest()),
                 ],
                 nav,
@@ -188,8 +194,8 @@ impl Component for SystemTab {
                     .render(
                         ui,
                         &[
-                            ("USED", &info.global.mem_used),
-                            ("RECLAIMABLE", &info.global.mem_reclaimable),
+                            ("Used", &info.global.mem_used),
+                            ("Including reclaimable", &info.global.mem_inc_reclaimable),
                         ],
                     );
                 }
@@ -204,9 +210,9 @@ impl Component for SystemTab {
                     .render(
                         ui,
                         &[
-                            ("READ", &info.total_partition.read),
-                            ("WRITE", &info.total_partition.written),
-                            ("DISCARD", &info.total_partition.discarded),
+                            ("Read", &info.total_partition.read),
+                            ("Write", &info.total_partition.written),
+                            ("Discard", &info.total_partition.discarded),
                         ],
                     );
                 }
@@ -220,7 +226,10 @@ impl Component for SystemTab {
                     }
                     .render(
                         ui,
-                        &[("RX", &info.total_net.rx), ("TX", &info.total_net.tx)],
+                        &[
+                            ("Receive", &info.total_net.rx),
+                            ("Transmit", &info.total_net.tx),
+                        ],
                     );
                 }
                 SystemNavigation::Gpu => {
@@ -234,8 +243,8 @@ impl Component for SystemTab {
                     .render(
                         ui,
                         &[
-                            ("GPU BUSY", &info.total_gpu.gpu_busy),
-                            ("VRAM BUSY", &info.total_gpu.vram_busy),
+                            ("GPU busy", &info.total_gpu.gpu_busy),
+                            ("VRAM busy", &info.total_gpu.vram_busy),
                         ],
                     );
                     TimeSeries {
@@ -244,14 +253,14 @@ impl Component for SystemTab {
                         kind: TimeSeriesKind::Primary,
                         value_kind: ValueKind::Bytes,
                     }
-                    .render(ui, &[("VRAM", &info.total_gpu.vram_used)]);
+                    .render(ui, &[("VRAM usage", &info.total_gpu.vram_used)]);
                     TimeSeries {
                         name: "GPU TEMP",
                         max_y: f64::INFINITY,
                         kind: TimeSeriesKind::Primary,
                         value_kind: ValueKind::Temperature,
                     }
-                    .render(ui, &[("TEMP", &info.total_gpu.max_temperature)]);
+                    .render(ui, &[("Max temperature", &info.total_gpu.max_temperature)]);
                 }
             })
         });
