@@ -58,6 +58,7 @@ pub struct NetInterfaceInfo {
 }
 #[derive(Default, Debug)]
 pub struct GpuInfo {
+    wma_vram_busy: WindowMovingAverage1s,
     wma_gpu_busy: WindowMovingAverage1s,
     pub vram_total: f64,
     pub vram_used: Series<f64>,
@@ -239,7 +240,10 @@ impl GpuInfo {
     fn update(&mut self, new: &GpuSnapshot) {
         self.vram_total = new.mem_info_vram_total as f64;
         self.vram_used.push(new.mem_info_vram_used as f64);
-        self.vram_busy.push(new.mem_busy_percent as f64 / 100.0);
+        self.vram_busy.push(
+            self.wma_vram_busy
+                .smooth(new.mem_busy_percent as f64 / 100.0),
+        );
         self.gpu_busy.push(
             self.wma_gpu_busy
                 .smooth(new.gpu_busy_percent as f64 / 100.0),
