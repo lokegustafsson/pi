@@ -127,23 +127,24 @@ impl Component for SystemTab {
                     max_y: cpus as f64,
                     kind: TimeSeriesKind::Primary,
                 }
-                .render(ui, &[("", &info.total_cpu.total)]);
+                .render(ui, &[("Total CPU", &info.total_cpu.total)]);
                 TimeSeries {
                     name: "CPU TEMP",
                     max_y: f64::INFINITY,
                     kind: TimeSeriesKind::Primary,
                 }
-                .render(ui, &[("", &info.global.cpu_max_temp)]);
+                .render(ui, &[("Max temperature", &info.global.cpu_max_temp)]);
                 Grid::new("cpu-grid").num_columns(long_side).show(ui, |ui| {
                     for i in 0..cpus {
+                        let name = format!("CPU{i}");
                         TimeSeries {
-                            name: &format!("CPU{i}"),
+                            name: &name,
                             max_y: 1.0,
                             kind: TimeSeriesKind::GridCell {
                                 width: grid_cell_width,
                             },
                         }
-                        .render(ui, &[("", &info.by_cpu[i].total)]);
+                        .render(ui, &[(&name, &info.by_cpu[i].total)]);
                         if (i + 1) % long_side == 0 {
                             ui.end_row();
                         }
