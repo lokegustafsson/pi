@@ -1,48 +1,29 @@
+# PI - Process Information
+
+A work-in-progress graphical process and system monitor for Linux
+
+# TODO
+
+- Test on somewhat diverse computers
+
 ## UI
 
-- Color cells by amount
-- System tabs: CPU, RAM, DISK, NETWORK, GPU
+- Process list/tree: Color cells by amount
 - Process list/tree: Granularity user/processgroup/process/thread
 - Process list/tree: Fields CPU/GPU/MEM usage. NET/DISK read/write.
 - Process list/tree: Filters
 
-## System Info
+## Missing system Info
 
-### SYSTEM
+- SYSTEM: Handles current / cumulative
+- SYSTEM: Threads current / cumulative
+- SYSTEM: Processes current / cumulative
+- SYSTEM: Uptime
+- SYSTEM: Per-cpu temperature (where is this available? not hwmon..)
+- MEM: Swap usage and size
+- DISK: Usage by folder breakdown? (not real-time obviously)
 
-- Handles current / cumulative
-- Threads current / cumulative
-- Processes current / cumulative
-- Uptime
-
-### CPU
-
-- CPU temperature (per CPU / max)
-- CPU usage (per CPU / total)
-
-### MEMORY
-
-- RAM usage and size
-- SWAP usage and size
-
-### DISK
-
-- DISK usage and size (breakdown?, big folders?)
-- DISK read
-- DISK write
-
-### NETWORK
-
-- NETWORK receive
-- NETWORK transmit
-
-### GPU
-
-- GPU max temperature
-- GPU usage
-- VRAM usage
-
-## Process info
+## Missing Process info (all of it!)
 
 - Granularity user/processgroup/process/thread
 - user
