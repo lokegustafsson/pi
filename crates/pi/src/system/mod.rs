@@ -214,7 +214,7 @@ impl Page {
     fn cpu(ui: &mut Ui, info: &SystemInfo) {
         let cpus = info.by_cpu.len();
         let long_side = (cpus as f64).sqrt().ceil() as usize;
-        let grid_cell_width = ui.available_width() / (long_side as f32);
+        let grid_cell_width = ui.available_width() / (long_side as f32) - MARGIN_PIXELS;
 
         ui.heading("CPU View");
         TimeSeries {
@@ -267,6 +267,10 @@ impl Page {
         );
     }
     fn disk(ui: &mut Ui, info: &SystemInfo) {
+        let parts = info.by_partition.len();
+        let long_side = (parts as f64).sqrt().ceil() as usize;
+        let grid_cell_width = ui.available_width() / (long_side as f32) - MARGIN_PIXELS;
+
         ui.heading("DISK View");
         TimeSeries {
             name: "DISK",
@@ -282,8 +286,37 @@ impl Page {
                 ("Discard", &info.total_partition.discarded),
             ],
         );
+        Grid::new("partition-grid")
+            .num_columns(long_side)
+            .show(ui, |ui| {
+                for (i, (partition, part_info)) in info.by_partition.iter().enumerate() {
+                    TimeSeries {
+                        name: partition,
+                        max_y: f64::INFINITY,
+                        kind: TimeSeriesKind::GridCell {
+                            width: grid_cell_width,
+                        },
+                        value_kind: ValueKind::Bytes,
+                    }
+                    .render(
+                        ui,
+                        &[
+                            (&format!("{partition} read"), &part_info.read),
+                            (&format!("{partition} write"), &part_info.written),
+                            (&format!("{partition} discard"), &part_info.discarded),
+                        ],
+                    );
+                    if (i + 1) % long_side == 0 {
+                        ui.end_row();
+                    }
+                }
+            });
     }
     fn net(ui: &mut Ui, info: &SystemInfo) {
+        let interfaces = info.by_partition.len();
+        let long_side = (interfaces as f64).sqrt().ceil() as usize;
+        let grid_cell_width = ui.available_width() / (long_side as f32) - MARGIN_PIXELS;
+
         ui.heading("NET View");
         TimeSeries {
             name: "NET",
@@ -298,6 +331,28 @@ impl Page {
                 ("Transmit", &info.total_net.tx),
             ],
         );
+        Grid::new("net-grid").num_columns(long_side).show(ui, |ui| {
+            for (i, (interface, interface_info)) in info.by_net_interface.iter().enumerate() {
+                TimeSeries {
+                    name: interface,
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::GridCell {
+                        width: grid_cell_width,
+                    },
+                    value_kind: ValueKind::Bytes,
+                }
+                .render(
+                    ui,
+                    &[
+                        (&format!("{interface} receive"), &interface_info.rx),
+                        (&format!("{interface} transmit"), &interface_info.tx),
+                    ],
+                );
+                if (i + 1) % long_side == 0 {
+                    ui.end_row();
+                }
+            }
+        });
     }
     fn gpu(ui: &mut Ui, info: &SystemInfo) {
         ui.heading("GPU View");
