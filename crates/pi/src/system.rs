@@ -1,4 +1,4 @@
-use crate::Component;
+use crate::{show::Show, Component};
 use eframe::egui::{
     self,
     plot::{Corner, Legend, Line, Plot, PlotPoints},
@@ -50,11 +50,7 @@ impl Component for SystemTab {
                 size,
                 "RAM",
                 &[
-                    &format!(
-                        "{:.0}/{:.0}GiB",
-                        mem_used / 2.0f64.powi(30),
-                        info.global.mem_total / 2.0f64.powi(30),
-                    ),
+                    &Show::size_fraction(mem_used, info.global.mem_total).to_string(),
                     &format!("({:.0}%)", 100.0 * mem_used / info.global.mem_total),
                 ],
                 nav,
@@ -67,22 +63,16 @@ impl Component for SystemTab {
                 size,
                 "DISK",
                 &[
-                    &format!(
-                        "{:.0}/{:.0}GiB",
-                        info.total_partition.used / 2.0f64.powi(30),
-                        info.total_partition.capacity / 2.0f64.powi(30),
+                    &Show::size_fraction(info.total_partition.used, info.total_partition.capacity)
+                        .to_string(),
+                    &Show::rate(TICK_PER_SEC * info.total_partition.wma_read.get(), "Read "),
+                    &Show::rate(
+                        TICK_PER_SEC * info.total_partition.wma_written.get(),
+                        "Write ",
                     ),
-                    &format!(
-                        "Read {:.0}B/s",
-                        TICK_PER_SEC * info.total_partition.wma_read.get()
-                    ),
-                    &format!(
-                        "Write {:.0}B/s",
-                        TICK_PER_SEC * info.total_partition.wma_written.get()
-                    ),
-                    &format!(
-                        "Discard {:.0}B/s",
-                        TICK_PER_SEC * info.total_partition.wma_discarded.get()
+                    &Show::rate(
+                        TICK_PER_SEC * info.total_partition.wma_discarded.get(),
+                        "Discard ",
                     ),
                 ],
                 nav,
@@ -95,8 +85,8 @@ impl Component for SystemTab {
                 size,
                 "NET",
                 &[
-                    &format!("RX {:.0}B/s", TICK_PER_SEC * info.total_net.wma_rx.get()),
-                    &format!("TX {:.0}B/s", TICK_PER_SEC * info.total_net.wma_tx.get()),
+                    &Show::rate(TICK_PER_SEC * info.total_net.wma_rx.get(), "RX "),
+                    &Show::rate(TICK_PER_SEC * info.total_net.wma_tx.get(), "TX "),
                 ],
                 nav,
                 SystemNavigation::Net,
@@ -108,10 +98,9 @@ impl Component for SystemTab {
                 size,
                 "GPU",
                 &[
-                    &format!(
-                        "{:.0}/{:.0}GiB",
-                        info.total_gpu.vram_used.latest() / 2.0f64.powi(30),
-                        info.total_gpu.vram_total / 2.0f64.powi(30),
+                    &Show::size_fraction(
+                        info.total_gpu.vram_used.latest(),
+                        info.total_gpu.vram_total,
                     ),
                     &format!("Mem {:.0}%", 100.0 * info.total_gpu.vram_busy.latest()),
                     &format!("{:.0}%", 100.0 * info.total_gpu.gpu_busy.latest()),

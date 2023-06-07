@@ -10,6 +10,7 @@ use ingest::Ingester;
 use tracing_subscriber::Layer;
 
 mod process;
+mod show;
 mod system;
 
 fn main() -> Result<(), eframe::Error> {
