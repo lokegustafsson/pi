@@ -159,7 +159,8 @@ impl PartitionInfo {
                 .iter()
                 .filter(|stats| {
                     let is_partition = stats.minor_device_number != 0;
-                    is_partition
+                    let is_loopback = stats.device_name.starts_with("loop");
+                    is_partition && !is_loopback
                 })
                 .map(|stats| (&stats.device_name, stats)),
             new.disk_stats
