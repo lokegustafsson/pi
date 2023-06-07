@@ -1,5 +1,3 @@
-use std::fmt::Arguments;
-
 #[derive(Clone, Copy)]
 pub struct Show {
     value: f64,
@@ -12,8 +10,11 @@ impl Show {
     const SIZES: [&str; Self::NUM] = ["B", "KB", "MB", "GB", "TB"];
     const K: f64 = 1024.0;
 
+    fn scale_of(num: f64) -> u8 {
+        (num.max(1.1).log(Self::K) as usize).clamp(0, Self::NUM - 1) as u8
+    }
     fn new(num: f64) -> Self {
-        let scale = (num.max(1.1).log(Self::K) as usize).clamp(0, Self::NUM - 1) as u8;
+        let scale = Self::scale_of(num);
         let value = num / Self::K.powi(scale as i32);
         Self {
             value,
@@ -40,6 +41,16 @@ impl Show {
         }
     }
 
+    pub fn size_at_scale(used: f64, reference: f64) -> String {
+        let scale = Self::scale_of(reference);
+        let Self {
+            value,
+            num_decimals,
+            scale: _,
+        } = Self::at_scale(used, scale);
+        let unit = Self::SIZES[scale as usize];
+        format!("{value:>4.*}{unit}", num_decimals as usize,)
+    }
     pub fn size_fraction(used: f64, total: f64) -> String {
         let Self {
             value: tot_value,

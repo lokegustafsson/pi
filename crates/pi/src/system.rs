@@ -5,6 +5,7 @@ use eframe::egui::{
     Align, Frame, Grid, Label, Layout, Sense, Ui, Vec2,
 };
 use ingest::{Series, SystemInfo, HISTORY, TICK_DELAY};
+use std::{collections::btree_map::Range, ops::RangeInclusive};
 
 const TICK_PER_SEC: f64 = ingest::SUBSEC as f64;
 
@@ -34,7 +35,6 @@ impl Component for SystemTab {
             left_panel_item(
                 ui,
                 size,
-                "CPU",
                 &[
                     &format!("{:.2}/{}", total_cpu, num_cpu),
                     &format!("({:.0}%)", 100.0 * total_cpu / (num_cpu as f64)),
@@ -43,12 +43,16 @@ impl Component for SystemTab {
                 nav,
                 SystemNavigation::Cpu,
                 &[("", &info.total_cpu.total)],
-                num_cpu as f64,
+                TimeSeries {
+                    name: "CPU",
+                    max_y: num_cpu as f64,
+                    kind: TimeSeriesKind::Preview,
+                    value_kind: ValueKind::Percent,
+                },
             );
             left_panel_item(
                 ui,
                 size,
-                "RAM",
                 &[
                     &Show::size_fraction(mem_used, info.global.mem_total).to_string(),
                     &format!("({:.0}%)", 100.0 * mem_used / info.global.mem_total),
@@ -56,12 +60,16 @@ impl Component for SystemTab {
                 nav,
                 SystemNavigation::Ram,
                 &[("", &info.global.mem_used)],
-                info.global.mem_total,
+                TimeSeries {
+                    name: "RAM",
+                    max_y: info.global.mem_total,
+                    kind: TimeSeriesKind::Preview,
+                    value_kind: ValueKind::Bytes,
+                },
             );
             left_panel_item(
                 ui,
                 size,
-                "DISK",
                 &[
                     &Show::size_fraction(info.total_partition.used, info.total_partition.capacity)
                         .to_string(),
@@ -81,12 +89,16 @@ impl Component for SystemTab {
                     ("READ", &info.total_partition.read),
                     ("WRITE", &info.total_partition.written),
                 ],
-                f64::INFINITY,
+                TimeSeries {
+                    name: "DISK",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Preview,
+                    value_kind: ValueKind::Bytes,
+                },
             );
             left_panel_item(
                 ui,
                 size,
-                "NET",
                 &[
                     &Show::rate(TICK_PER_SEC * info.total_net.wma_rx.get(), "RX "),
                     &Show::rate(TICK_PER_SEC * info.total_net.wma_tx.get(), "TX "),
@@ -94,12 +106,16 @@ impl Component for SystemTab {
                 nav,
                 SystemNavigation::Net,
                 &[("RX", &info.total_net.rx), ("TX", &info.total_net.tx)],
-                f64::INFINITY,
+                TimeSeries {
+                    name: "NET",
+                    max_y: f64::INFINITY,
+                    kind: TimeSeriesKind::Preview,
+                    value_kind: ValueKind::Bytes,
+                },
             );
             left_panel_item(
                 ui,
                 size,
-                "GPU",
                 &[
                     &Show::size_fraction(
                         info.total_gpu.vram_used.latest(),
@@ -112,7 +128,12 @@ impl Component for SystemTab {
                 nav,
                 SystemNavigation::Gpu,
                 &[("", &info.total_gpu.gpu_busy)],
-                info.by_gpu.len() as f64,
+                TimeSeries {
+                    name: "GPU",
+                    max_y: info.by_gpu.len() as f64,
+                    kind: TimeSeriesKind::Preview,
+                    value_kind: ValueKind::Percent,
+                },
             );
         });
         egui::ScrollArea::vertical().show(ui, |ui| match nav {
@@ -126,12 +147,14 @@ impl Component for SystemTab {
                     name: "Total CPU",
                     max_y: cpus as f64,
                     kind: TimeSeriesKind::Primary,
+                    value_kind: ValueKind::Percent,
                 }
                 .render(ui, &[("Total CPU", &info.total_cpu.total)]);
                 TimeSeries {
                     name: "CPU TEMP",
                     max_y: f64::INFINITY,
                     kind: TimeSeriesKind::Primary,
+                    value_kind: ValueKind::Temperature,
                 }
                 .render(ui, &[("Max temperature", &info.global.cpu_max_temp)]);
                 Grid::new("cpu-grid").num_columns(long_side).show(ui, |ui| {
@@ -143,6 +166,7 @@ impl Component for SystemTab {
                             kind: TimeSeriesKind::GridCell {
                                 width: grid_cell_width,
                             },
+                            value_kind: ValueKind::Percent,
                         }
                         .render(ui, &[(&name, &info.by_cpu[i].total)]);
                         if (i + 1) % long_side == 0 {
@@ -157,6 +181,7 @@ impl Component for SystemTab {
                     name: "RAM",
                     max_y: info.global.mem_total as f64,
                     kind: TimeSeriesKind::Primary,
+                    value_kind: ValueKind::Bytes,
                 }
                 .render(
                     ui,
@@ -172,6 +197,7 @@ impl Component for SystemTab {
                     name: "DISK",
                     max_y: f64::INFINITY,
                     kind: TimeSeriesKind::Primary,
+                    value_kind: ValueKind::Bytes,
                 }
                 .render(
                     ui,
@@ -188,6 +214,7 @@ impl Component for SystemTab {
                     name: "NET",
                     max_y: f64::INFINITY,
                     kind: TimeSeriesKind::Primary,
+                    value_kind: ValueKind::Bytes,
                 }
                 .render(
                     ui,
@@ -200,6 +227,7 @@ impl Component for SystemTab {
                     name: "GPU BUSY",
                     max_y: info.by_gpu.len() as f64,
                     kind: TimeSeriesKind::Primary,
+                    value_kind: ValueKind::Percent,
                 }
                 .render(
                     ui,
@@ -212,12 +240,14 @@ impl Component for SystemTab {
                     name: "GPU VRAM",
                     max_y: f64::INFINITY,
                     kind: TimeSeriesKind::Primary,
+                    value_kind: ValueKind::Bytes,
                 }
                 .render(ui, &[("VRAM", &info.total_gpu.vram_used)]);
                 TimeSeries {
                     name: "GPU TEMP",
                     max_y: f64::INFINITY,
                     kind: TimeSeriesKind::Primary,
+                    value_kind: ValueKind::Temperature,
                 }
                 .render(ui, &[("TEMP", &info.total_gpu.max_temperature)]);
             }
@@ -228,16 +258,15 @@ impl Component for SystemTab {
 fn left_panel_item(
     ui: &mut Ui,
     size: Vec2,
-    label: &'static str,
     sublabels: &[&str],
     nav: &mut SystemNavigation,
     value: SystemNavigation,
     series: &[(&str, &Series<f64>)],
-    max_y: f64,
+    time_series: TimeSeries,
 ) {
     let selected = *nav == value;
     let resp = ui
-        .push_id(label, |ui| {
+        .push_id(time_series.name, |ui| {
             ui.allocate_ui(size, |ui| {
                 Frame::none()
                     .inner_margin(6.0)
@@ -258,17 +287,12 @@ fn left_panel_item(
                             Layout::right_to_left(Align::Center),
                             |ui| {
                                 ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
-                                    ui.add(Label::new(label).wrap(false));
+                                    ui.add(Label::new(time_series.name).wrap(false));
                                     for text in sublabels {
                                         ui.add(Label::new(*text).wrap(false));
                                     }
                                 });
-                                TimeSeries {
-                                    name: label,
-                                    max_y,
-                                    kind: TimeSeriesKind::Preview,
-                                }
-                                .render(ui, series);
+                                time_series.render(ui, series);
                             },
                         )
                     });
@@ -284,12 +308,19 @@ struct TimeSeries<'a> {
     name: &'a str,
     max_y: f64,
     kind: TimeSeriesKind,
+    value_kind: ValueKind,
 }
 #[derive(PartialEq)]
 enum TimeSeriesKind {
     Preview,
     Primary,
     GridCell { width: f32 },
+}
+#[derive(PartialEq)]
+enum ValueKind {
+    Percent,
+    Bytes,
+    Temperature,
 }
 impl<'a> TimeSeries<'a> {
     fn render(&self, ui: &mut Ui, series: &[(&str, &Series<f64>)]) {
@@ -298,7 +329,7 @@ impl<'a> TimeSeries<'a> {
             .map(|(_, series)| series.iter().copied().max_by(f64::total_cmp).unwrap())
             .reduce(f64::max)
             .unwrap();
-        let mut plot = Plot::new(self.name)
+        Plot::new(self.name)
             .view_aspect(match self.kind {
                 TimeSeriesKind::Preview | TimeSeriesKind::Primary => 1.6,
                 TimeSeriesKind::GridCell { .. } => 1.0,
@@ -319,6 +350,14 @@ impl<'a> TimeSeries<'a> {
             .include_x(0)
             .include_y(0)
             .include_y(self.max_y.min(1.2 * series_max_y))
+            .y_axis_formatter(match self.value_kind {
+                ValueKind::Bytes => |val, range: &RangeInclusive<f64>| {
+                    let maximum = *range.end();
+                    Show::size_at_scale(val, maximum)
+                },
+                ValueKind::Percent => |val, _: &_| format!("{:.0}%", 100.0 * val),
+                ValueKind::Temperature => |val, _: &_| format!("{val}°C"),
+            })
             .with_prop(
                 match self.kind {
                     TimeSeriesKind::Preview => None,
