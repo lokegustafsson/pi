@@ -355,6 +355,9 @@ impl Page {
         });
     }
     fn gpu(ui: &mut Ui, info: &SystemInfo) {
+        let columns = 2;
+        let grid_cell_width = ui.available_width() / (columns as f32) - MARGIN_PIXELS;
+
         ui.heading("GPU View");
         TimeSeries {
             name: "GPU BUSY",
@@ -369,19 +372,25 @@ impl Page {
                 ("VRAM busy", &info.total_gpu.vram_busy),
             ],
         );
-        TimeSeries {
-            name: "GPU VRAM",
-            max_y: f64::INFINITY,
-            kind: TimeSeriesKind::Primary,
-            value_kind: ValueKind::Bytes,
-        }
-        .render(ui, &[("VRAM usage", &info.total_gpu.vram_used)]);
-        TimeSeries {
-            name: "GPU TEMP",
-            max_y: f64::INFINITY,
-            kind: TimeSeriesKind::Primary,
-            value_kind: ValueKind::Temperature,
-        }
-        .render(ui, &[("Max temperature", &info.total_gpu.max_temperature)]);
+        Grid::new("gpu-grid").num_columns(columns).show(ui, |ui| {
+            TimeSeries {
+                name: "GPU VRAM",
+                max_y: f64::INFINITY,
+                kind: TimeSeriesKind::GridCell {
+                    width: grid_cell_width,
+                },
+                value_kind: ValueKind::Bytes,
+            }
+            .render(ui, &[("VRAM usage", &info.total_gpu.vram_used)]);
+            TimeSeries {
+                name: "GPU TEMP",
+                max_y: f64::INFINITY,
+                kind: TimeSeriesKind::GridCell {
+                    width: grid_cell_width,
+                },
+                value_kind: ValueKind::Temperature,
+            }
+            .render(ui, &[("Max temperature", &info.total_gpu.max_temperature)]);
+        });
     }
 }
