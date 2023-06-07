@@ -29,10 +29,10 @@ pub struct GlobalInfo {
 }
 #[derive(Clone, Default, Debug)]
 pub struct CpuInfo {
-    wma_total: WindowMovingAverage,
-    wma_user: WindowMovingAverage,
-    wma_system: WindowMovingAverage,
-    wma_guest: WindowMovingAverage,
+    wma_total: WindowMovingAverage1s,
+    wma_user: WindowMovingAverage1s,
+    wma_system: WindowMovingAverage1s,
+    wma_guest: WindowMovingAverage1s,
     pub total: Series<f64>,
     pub user: Series<f64>,
     pub system: Series<f64>,
@@ -40,6 +40,9 @@ pub struct CpuInfo {
 }
 #[derive(Default, Debug)]
 pub struct PartitionInfo {
+    pub wma_read: WindowMovingAverage5s,
+    pub wma_written: WindowMovingAverage5s,
+    pub wma_discarded: WindowMovingAverage5s,
     pub capacity: f64,
     pub used: f64,
     pub read: Series<f64>,
@@ -48,14 +51,14 @@ pub struct PartitionInfo {
 }
 #[derive(Default, Debug)]
 pub struct NetInterfaceInfo {
-    wma_rx: WindowMovingAverage,
-    wma_tx: WindowMovingAverage,
+    pub wma_rx: WindowMovingAverage5s,
+    pub wma_tx: WindowMovingAverage5s,
     pub rx: Series<f64>,
     pub tx: Series<f64>,
 }
 #[derive(Default, Debug)]
 pub struct GpuInfo {
-    wma_gpu_busy: WindowMovingAverage,
+    wma_gpu_busy: WindowMovingAverage1s,
     pub vram_total: f64,
     pub vram_used: Series<f64>,
     pub vram_busy: Series<f64>,
@@ -125,10 +128,10 @@ impl CpuInfo {
         let guest = (new.guest - old.guest) as f64;
         let busy = user + system + guest;
         let total = if busy + idle > 0.0 { busy + idle } else { 1.0 };
-        self.total.push(self.wma_total.add_sample(busy / total));
-        self.user.push(self.wma_user.add_sample(user / total));
-        self.system.push(self.wma_system.add_sample(system / total));
-        self.guest.push(self.wma_guest.add_sample(guest / total));
+        self.total.push(self.wma_total.smooth(busy / total));
+        self.user.push(self.wma_user.smooth(user / total));
+        self.system.push(self.wma_system.smooth(system / total));
+        self.guest.push(self.wma_guest.smooth(guest / total));
     }
     fn push_sum_of_others(&mut self, others: &[Self]) {
         let mut total = 0.0;
@@ -179,12 +182,15 @@ impl PartitionInfo {
             self.used =
                 (statfs.block_size() as u64 * (statfs.blocks() - statfs.blocks_available())) as f64;
         }
-        self.read
-            .push(512.0 * (new.sectors_read - old.sectors_read) as f64);
-        self.written
-            .push(512.0 * (new.sectors_written - old.sectors_written) as f64);
-        self.discarded
-            .push(512.0 * (new.sectors_discarded - old.sectors_discarded) as f64);
+        let read = 512.0 * (new.sectors_read - old.sectors_read) as f64;
+        let written = 512.0 * (new.sectors_written - old.sectors_written) as f64;
+        let discarded = 512.0 * (new.sectors_discarded - old.sectors_discarded) as f64;
+        self.wma_read.add(read);
+        self.wma_written.add(written);
+        self.wma_discarded.add(discarded);
+        self.read.push(read);
+        self.written.push(written);
+        self.discarded.push(discarded);
     }
     fn push_sum_of_others<'a>(&mut self, others: impl Iterator<Item = &'a Self>) {
         self.capacity = 0.0;
@@ -199,6 +205,9 @@ impl PartitionInfo {
             written += other.written.latest();
             discarded += other.discarded.latest();
         }
+        self.wma_read.add(read);
+        self.wma_written.add(written);
+        self.wma_discarded.add(discarded);
         self.read.push(read);
         self.written.push(written);
         self.discarded.push(discarded);
@@ -206,10 +215,12 @@ impl PartitionInfo {
 }
 impl NetInterfaceInfo {
     fn update(&mut self, old: &NetInterfaceSnapshot, new: &NetInterfaceSnapshot) {
-        self.rx
-            .push(self.wma_rx.add_sample((new.rx_bytes - old.rx_bytes) as f64));
-        self.tx
-            .push(self.wma_tx.add_sample((new.tx_bytes - old.tx_bytes) as f64));
+        let rx = (new.rx_bytes - old.rx_bytes) as f64;
+        let tx = (new.tx_bytes - old.tx_bytes) as f64;
+        self.wma_rx.add(rx);
+        self.wma_tx.add(tx);
+        self.rx.push(rx);
+        self.tx.push(tx);
     }
     fn push_sum_of_others<'a>(&mut self, others: impl Iterator<Item = &'a Self>) {
         let mut rx = 0.0;
@@ -218,6 +229,8 @@ impl NetInterfaceInfo {
             rx += other.rx.latest();
             tx += other.tx.latest();
         }
+        self.wma_rx.add(rx);
+        self.wma_tx.add(tx);
         self.rx.push(rx);
         self.tx.push(tx);
     }
@@ -229,7 +242,7 @@ impl GpuInfo {
         self.vram_busy.push(new.mem_busy_percent as f64 / 100.0);
         self.gpu_busy.push(
             self.wma_gpu_busy
-                .add_sample(new.gpu_busy_percent as f64 / 100.0),
+                .smooth(new.gpu_busy_percent as f64 / 100.0),
         );
         self.max_temperature.push(new.max_temperature as f64 / 1e3);
     }
@@ -269,24 +282,33 @@ fn intersect_old_new<'a, T: 'a, U: Default>(
     }
 }
 
+type WindowMovingAverage1s = WindowMovingAverage<{ 1 * SUBSEC as usize }>;
+type WindowMovingAverage5s = WindowMovingAverage<{ 5 * SUBSEC as usize }>;
+
 #[derive(Clone, Debug)]
-struct WindowMovingAverage {
+pub struct WindowMovingAverage<const WINDOW_SIZE: usize> {
     i: usize,
-    samples: [f64; Self::SMOOTHING_WINDOW],
+    samples: [f64; WINDOW_SIZE],
 }
-impl WindowMovingAverage {
-    const SMOOTHING_WINDOW: usize = SUBSEC as usize;
-    fn add_sample(&mut self, sample: f64) -> f64 {
+impl<const WINDOW_SIZE: usize> WindowMovingAverage<WINDOW_SIZE> {
+    fn add(&mut self, sample: f64) {
         self.samples[self.i] = sample;
-        self.i = (self.i + 1) % Self::SMOOTHING_WINDOW;
-        self.samples.iter().copied().sum::<f64>() / Self::SMOOTHING_WINDOW as f64
+        self.i = (self.i + 1) % WINDOW_SIZE;
+    }
+    pub fn get(&self) -> f64 {
+        self.samples.iter().copied().sum::<f64>() / WINDOW_SIZE as f64
+    }
+    #[must_use]
+    fn smooth(&mut self, sample: f64) -> f64 {
+        self.add(sample);
+        self.get()
     }
 }
-impl Default for WindowMovingAverage {
+impl<const WINDOW_SIZE: usize> Default for WindowMovingAverage<WINDOW_SIZE> {
     fn default() -> Self {
         Self {
             i: 0,
-            samples: [0.0; Self::SMOOTHING_WINDOW],
+            samples: [0.0; WINDOW_SIZE],
         }
     }
 }

@@ -15,7 +15,7 @@ mod system;
 pub use process::ProcessInfo;
 pub use system::SystemInfo;
 
-const SUBSEC: u64 = 60;
+pub const SUBSEC: u64 = 60;
 pub const TICK_DELAY: Duration = Duration::from_micros(1_000_000 / SUBSEC);
 pub const HISTORY: usize = (60 * SUBSEC + 1) as usize;
 

@@ -6,6 +6,8 @@ use eframe::egui::{
 };
 use ingest::{Series, SystemInfo, HISTORY, TICK_DELAY};
 
+const TICK_PER_SEC: f64 = ingest::SUBSEC as f64;
+
 pub struct SystemTab;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SystemNavigation {
@@ -70,9 +72,18 @@ impl Component for SystemTab {
                         info.total_partition.used / 2.0f64.powi(30),
                         info.total_partition.capacity / 2.0f64.powi(30),
                     ),
-                    &format!("Read {:.0}B/s", info.total_partition.read.latest()),
-                    &format!("Write {:.0}B/s", info.total_partition.written.latest()),
-                    &format!("Discard {:.0}B/s", info.total_partition.discarded.latest()),
+                    &format!(
+                        "Read {:.0}B/s",
+                        TICK_PER_SEC * info.total_partition.wma_read.get()
+                    ),
+                    &format!(
+                        "Write {:.0}B/s",
+                        TICK_PER_SEC * info.total_partition.wma_written.get()
+                    ),
+                    &format!(
+                        "Discard {:.0}B/s",
+                        TICK_PER_SEC * info.total_partition.wma_discarded.get()
+                    ),
                 ],
                 nav,
                 SystemNavigation::Disk,
@@ -84,8 +95,8 @@ impl Component for SystemTab {
                 size,
                 "NET",
                 &[
-                    &format!("RX {:.0}B/s", info.total_net.rx.latest()),
-                    &format!("TX {:.0}B/s", info.total_net.tx.latest()),
+                    &format!("RX {:.0}B/s", TICK_PER_SEC * info.total_net.wma_rx.get()),
+                    &format!("TX {:.0}B/s", TICK_PER_SEC * info.total_net.wma_tx.get()),
                 ],
                 nav,
                 SystemNavigation::Net,
