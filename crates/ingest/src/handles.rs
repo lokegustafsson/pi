@@ -114,18 +114,18 @@ impl Handles {
                     });
                     has_similar_name_children
                 })
-                .map(|drm| {
+                .filter_map(|drm| {
                     let device = drm.path().join("device");
-                    (
+                    Some((
                         drm.file_name().into_string().unwrap(),
                         GpuHandles {
-                            mem_info_vram_used: open(device.join("mem_info_vram_used")),
+                            mem_info_vram_used: try_open(device.join("mem_info_vram_used"))?,
                             mem_info_vram_total: open(device.join("mem_info_vram_total")),
                             mem_busy_percent: open(device.join("mem_busy_percent")),
                             gpu_busy_percent: open(device.join("gpu_busy_percent")),
                             temperatures: hwmon_get_temps(&device.join("hwmon/hwmon0")),
                         },
-                    )
+                    ))
                 })
                 .collect(),
         }
@@ -164,7 +164,18 @@ fn hwmon_get_temps(path: &Path) -> Vec<File> {
         .collect()
 }
 fn open(path: impl AsRef<Path>) -> File {
+    try_open(path.as_ref()).unwrap()
+}
+fn try_open(path: impl AsRef<Path>) -> Option<File> {
     let path = path.as_ref();
-    tracing::info!(?path, "opening");
-    File::open(path).unwrap()
+    match File::open(path) {
+        Ok(file) => {
+            tracing::info!(?path, "opening");
+            Some(file)
+        }
+        Err(err) => {
+            tracing::warn!(?path, ?err, "error opening");
+            None
+        }
+    }
 }
