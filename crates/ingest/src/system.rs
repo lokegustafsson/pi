@@ -29,10 +29,12 @@ pub struct GlobalInfo {
 }
 #[derive(Clone, Default, Debug)]
 pub struct CpuInfo {
+    wma_slow_total: WindowMovingAverage5s,
     wma_total: WindowMovingAverage1s,
     wma_user: WindowMovingAverage1s,
     wma_system: WindowMovingAverage1s,
     wma_guest: WindowMovingAverage1s,
+    pub slow_total: Series<f64>,
     pub total: Series<f64>,
     pub user: Series<f64>,
     pub system: Series<f64>,
@@ -129,22 +131,27 @@ impl CpuInfo {
         let guest = (new.guest - old.guest) as f64;
         let busy = user + system + guest;
         let total = if busy + idle > 0.0 { busy + idle } else { 1.0 };
+        self.slow_total
+            .push(self.wma_slow_total.smooth(busy / total));
         self.total.push(self.wma_total.smooth(busy / total));
         self.user.push(self.wma_user.smooth(user / total));
         self.system.push(self.wma_system.smooth(system / total));
         self.guest.push(self.wma_guest.smooth(guest / total));
     }
     fn push_sum_of_others(&mut self, others: &[Self]) {
+        let mut slow_total = 0.0;
         let mut total = 0.0;
         let mut user = 0.0;
         let mut system = 0.0;
         let mut guest = 0.0;
         for other in others {
+            slow_total += other.slow_total.latest();
             total += other.total.latest();
             user += other.user.latest();
             system += other.system.latest();
             guest += other.guest.latest();
         }
+        self.slow_total.push(slow_total);
         self.total.push(total);
         self.user.push(user);
         self.system.push(system);

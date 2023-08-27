@@ -43,7 +43,7 @@ impl Component for SystemTab {
 }
 
 fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SystemInfo) {
-    let total_cpu = info.total_cpu.total.latest();
+    let total_cpu = info.total_cpu.slow_total.latest();
     let num_cpu = info.by_cpu.len();
     let mem_used = info.global.mem_used.latest();
     let size = {
@@ -136,28 +136,30 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SystemInfo) 
             value_kind: ValueKind::Bytes,
         },
     );
-    left_panel_item(
-        ui,
-        size,
-        &[
-            &Show::size_fraction(info.total_gpu.vram_used.latest(), info.total_gpu.vram_total),
-            &format!(
-                "VRAM busy {:.0}%",
-                100.0 * info.total_gpu.vram_busy.latest()
-            ),
-            &format!("GPU {:.0}%", 100.0 * info.total_gpu.gpu_busy.latest()),
-            &format!("{:.0}C", info.total_gpu.max_temperature.latest()),
-        ],
-        nav,
-        SystemNavigation::Gpu,
-        &[("", &info.total_gpu.gpu_busy)],
-        TimeSeries {
-            name: "GPU",
-            max_y: info.by_gpu.len() as f64,
-            kind: TimeSeriesKind::Preview,
-            value_kind: ValueKind::Percent,
-        },
-    );
+    if !info.by_gpu.is_empty() {
+        left_panel_item(
+            ui,
+            size,
+            &[
+                &Show::size_fraction(info.total_gpu.vram_used.latest(), info.total_gpu.vram_total),
+                &format!(
+                    "VRAM busy {:.0}%",
+                    100.0 * info.total_gpu.vram_busy.latest()
+                ),
+                &format!("GPU {:.0}%", 100.0 * info.total_gpu.gpu_busy.latest()),
+                &format!("{:.0}C", info.total_gpu.max_temperature.latest()),
+            ],
+            nav,
+            SystemNavigation::Gpu,
+            &[("", &info.total_gpu.gpu_busy)],
+            TimeSeries {
+                name: "GPU",
+                max_y: info.by_gpu.len() as f64,
+                kind: TimeSeriesKind::Preview,
+                value_kind: ValueKind::Percent,
+            },
+        );
+    }
 }
 
 fn left_panel_item(
