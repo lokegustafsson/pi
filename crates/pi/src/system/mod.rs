@@ -28,17 +28,14 @@ impl Component for SystemTab {
         egui::SidePanel::left("system-left-panel").show_inside(ui, |ui| {
             side_panel_items(ui, nav, info);
         });
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            Frame::none()
-                .inner_margin(MARGIN_PIXELS)
-                .show(ui, |ui| match nav {
-                    SystemNavigation::Cpu => Page::cpu(ui, info),
-                    SystemNavigation::Ram => Page::ram(ui, info),
-                    SystemNavigation::Disk => Page::disk(ui, info),
-                    SystemNavigation::Net => Page::net(ui, info),
-                    SystemNavigation::Gpu => Page::gpu(ui, info),
-                })
-        });
+
+        match nav {
+            SystemNavigation::Cpu => Page::CPU.render(ui, info, info.by_cpu.len()),
+            SystemNavigation::Ram => Page::RAM.render(ui, info, 0),
+            SystemNavigation::Disk => Page::DISK.render(ui, info, info.by_partition.len()),
+            SystemNavigation::Net => Page::NET.render(ui, info, info.by_net_interface.len()),
+            SystemNavigation::Gpu => Page::GPU.render(ui, info, 2),
+        }
     }
 }
 
@@ -211,171 +208,195 @@ fn left_panel_item(
     }
 }
 
-struct Page;
+struct Page {
+    heading: &'static str,
+    main_series: &'static [fn(&mut Ui, &SystemInfo)],
+    grid_name: &'static str,
+    grid_series: fn(&mut Ui, &SystemInfo, f32, usize),
+}
 impl Page {
-    fn cpu(ui: &mut Ui, info: &SystemInfo) {
-        let cpus = info.by_cpu.len();
-        let long_side = (cpus as f64).sqrt().ceil() as usize;
-        let grid_cell_width = ui.available_width() / (long_side as f32) - MARGIN_PIXELS;
+    fn render(&self, ui: &mut Ui, info: &SystemInfo, num_grid_items: usize) {
+        let long_side = (num_grid_items as f64).sqrt().ceil() as usize;
+        let margin = ui.available_width() * 0.03;
+        let grid_cell_width =
+            (ui.available_width() - 2.0 * margin) / (long_side as f32) - MARGIN_PIXELS;
 
-        ui.heading("CPU View");
-        TimeSeries {
-            name: "Total CPU",
-            max_y: cpus as f64,
-            kind: TimeSeriesKind::Primary,
-            value_kind: ValueKind::Percent,
-        }
-        .render(ui, &[("Total CPU", &info.total_cpu.total)]);
-        TimeSeries {
-            name: "CPU TEMP",
-            max_y: f64::INFINITY,
-            kind: TimeSeriesKind::Primary,
-            value_kind: ValueKind::Temperature,
-        }
-        .render(ui, &[("Max temperature", &info.global.cpu_max_temp)]);
-        Grid::new("cpu-grid").num_columns(long_side).show(ui, |ui| {
-            for i in 0..cpus {
-                let name = format!("CPU{i}");
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            Frame::none().inner_margin(MARGIN_PIXELS).show(ui, |ui| {
+                ui.heading(self.heading);
+                for series in self.main_series {
+                    Frame::none()
+                        .inner_margin(margin)
+                        .show(ui, |ui| series(ui, info));
+                }
+                Frame::none().inner_margin(margin).show(ui, |ui| {
+                    Grid::new(self.grid_name)
+                        .num_columns(long_side)
+                        .show(ui, |ui| {
+                            for i in 0..num_grid_items {
+                                (self.grid_series)(ui, info, grid_cell_width, i);
+                                if (i + 1) % long_side == 0 {
+                                    ui.end_row();
+                                }
+                            }
+                        });
+                });
+            })
+        });
+    }
+    const CPU: Self = Self {
+        heading: "CPU View",
+        main_series: &[
+            |ui, info| {
                 TimeSeries {
-                    name: &name,
-                    max_y: 1.0,
-                    kind: TimeSeriesKind::GridCell {
-                        width: grid_cell_width,
-                    },
+                    name: "Total CPU",
+                    max_y: info.by_cpu.len() as f64,
+                    kind: TimeSeriesKind::Primary,
                     value_kind: ValueKind::Percent,
                 }
-                .render(ui, &[(&name, &info.by_cpu[i].total)]);
-                if (i + 1) % long_side == 0 {
-                    ui.end_row();
-                }
-            }
-        });
-    }
-
-    fn ram(ui: &mut Ui, info: &SystemInfo) {
-        ui.heading("RAM View");
-        TimeSeries {
-            name: "RAM",
-            max_y: info.global.mem_total as f64,
-            kind: TimeSeriesKind::Primary,
-            value_kind: ValueKind::Bytes,
-        }
-        .render(
-            ui,
-            &[
-                ("Used", &info.global.mem_used),
-                ("Including reclaimable", &info.global.mem_inc_reclaimable),
-            ],
-        );
-    }
-    fn disk(ui: &mut Ui, info: &SystemInfo) {
-        let parts = info.by_partition.len();
-        let long_side = (parts as f64).sqrt().ceil() as usize;
-        let grid_cell_width = ui.available_width() / (long_side as f32) - MARGIN_PIXELS;
-
-        ui.heading("DISK View");
-        TimeSeries {
-            name: "DISK",
-            max_y: f64::INFINITY,
-            kind: TimeSeriesKind::Primary,
-            value_kind: ValueKind::Bytes,
-        }
-        .render(
-            ui,
-            &[
-                ("Read", &info.total_partition.read),
-                ("Write", &info.total_partition.written),
-                ("Discard", &info.total_partition.discarded),
-            ],
-        );
-        Grid::new("partition-grid")
-            .num_columns(long_side)
-            .show(ui, |ui| {
-                for (i, (partition, part_info)) in info.by_partition.iter().enumerate() {
-                    TimeSeries {
-                        name: partition,
-                        max_y: f64::INFINITY,
-                        kind: TimeSeriesKind::GridCell {
-                            width: grid_cell_width,
-                        },
-                        value_kind: ValueKind::Bytes,
-                    }
-                    .render(
-                        ui,
-                        &[
-                            (&format!("{partition} read"), &part_info.read),
-                            (&format!("{partition} write"), &part_info.written),
-                            (&format!("{partition} discard"), &part_info.discarded),
-                        ],
-                    );
-                    if (i + 1) % long_side == 0 {
-                        ui.end_row();
-                    }
-                }
-            });
-    }
-    fn net(ui: &mut Ui, info: &SystemInfo) {
-        let interfaces = info.by_partition.len();
-        let long_side = (interfaces as f64).sqrt().ceil() as usize;
-        let grid_cell_width = ui.available_width() / (long_side as f32) - MARGIN_PIXELS;
-
-        ui.heading("NET View");
-        TimeSeries {
-            name: "NET",
-            max_y: f64::INFINITY,
-            kind: TimeSeriesKind::Primary,
-            value_kind: ValueKind::Bytes,
-        }
-        .render(
-            ui,
-            &[
-                ("Receive", &info.total_net.rx),
-                ("Transmit", &info.total_net.tx),
-            ],
-        );
-        Grid::new("net-grid").num_columns(long_side).show(ui, |ui| {
-            for (i, (interface, interface_info)) in info.by_net_interface.iter().enumerate() {
+                .render(ui, &[("Total CPU", &info.total_cpu.total)])
+            },
+            |ui, info| {
                 TimeSeries {
-                    name: interface,
+                    name: "CPU TEMP",
                     max_y: f64::INFINITY,
-                    kind: TimeSeriesKind::GridCell {
-                        width: grid_cell_width,
-                    },
-                    value_kind: ValueKind::Bytes,
+                    kind: TimeSeriesKind::Primary,
+                    value_kind: ValueKind::Temperature,
                 }
-                .render(
-                    ui,
-                    &[
-                        (&format!("{interface} receive"), &interface_info.rx),
-                        (&format!("{interface} transmit"), &interface_info.tx),
-                    ],
-                );
-                if (i + 1) % long_side == 0 {
-                    ui.end_row();
-                }
-            }
-        });
-    }
-    fn gpu(ui: &mut Ui, info: &SystemInfo) {
-        let columns = 2;
-        let grid_cell_width = ui.available_width() / (columns as f32) - MARGIN_PIXELS;
-
-        ui.heading("GPU View");
-        TimeSeries {
-            name: "GPU BUSY",
-            max_y: info.by_gpu.len() as f64,
-            kind: TimeSeriesKind::Primary,
-            value_kind: ValueKind::Percent,
-        }
-        .render(
-            ui,
-            &[
-                ("GPU busy", &info.total_gpu.gpu_busy),
-                ("VRAM busy", &info.total_gpu.vram_busy),
-            ],
-        );
-        Grid::new("gpu-grid").num_columns(columns).show(ui, |ui| {
+                .render(ui, &[("Max temperature", &info.global.cpu_max_temp)]);
+            },
+        ],
+        grid_name: "cpu-grid",
+        grid_series: |ui, info, grid_cell_width, i| {
+            let name = format!("CPU{i}");
             TimeSeries {
+                name: &name,
+                max_y: 1.0,
+                kind: TimeSeriesKind::GridCell {
+                    width: grid_cell_width,
+                },
+                value_kind: ValueKind::Percent,
+            }
+            .render(ui, &[(&name, &info.by_cpu[i].total)])
+        },
+    };
+    const RAM: Self = Self {
+        heading: "RAM View",
+        main_series: &[|ui, info| {
+            TimeSeries {
+                name: "RAM",
+                max_y: info.global.mem_total as f64,
+                kind: TimeSeriesKind::Primary,
+                value_kind: ValueKind::Bytes,
+            }
+            .render(
+                ui,
+                &[
+                    ("Used", &info.global.mem_used),
+                    ("Including reclaimable", &info.global.mem_inc_reclaimable),
+                ],
+            );
+        }],
+        grid_name: "",
+        grid_series: |_, _, _, _| (),
+    };
+    const DISK: Self = Self {
+        heading: "DISK View",
+        main_series: &[|ui, info| {
+            TimeSeries {
+                name: "DISK",
+                max_y: f64::INFINITY,
+                kind: TimeSeriesKind::Primary,
+                value_kind: ValueKind::Bytes,
+            }
+            .render(
+                ui,
+                &[
+                    ("Read", &info.total_partition.read),
+                    ("Write", &info.total_partition.written),
+                    ("Discard", &info.total_partition.discarded),
+                ],
+            );
+        }],
+        grid_name: "partition-grid",
+        grid_series: |ui, info, grid_cell_width, i| {
+            let (partition, part_info) = info.by_partition.iter().nth(i).unwrap();
+            TimeSeries {
+                name: partition,
+                max_y: f64::INFINITY,
+                kind: TimeSeriesKind::GridCell {
+                    width: grid_cell_width,
+                },
+                value_kind: ValueKind::Bytes,
+            }
+            .render(
+                ui,
+                &[
+                    (&format!("{partition} read"), &part_info.read),
+                    (&format!("{partition} write"), &part_info.written),
+                    (&format!("{partition} discard"), &part_info.discarded),
+                ],
+            );
+        },
+    };
+
+    const NET: Self = Self {
+        heading: "NET View",
+        main_series: &[|ui, info| {
+            TimeSeries {
+                name: "NET",
+                max_y: f64::INFINITY,
+                kind: TimeSeriesKind::Primary,
+                value_kind: ValueKind::Bytes,
+            }
+            .render(
+                ui,
+                &[
+                    ("Receive", &info.total_net.rx),
+                    ("Transmit", &info.total_net.tx),
+                ],
+            );
+        }],
+        grid_name: "net-grid",
+        grid_series: |ui, info, grid_cell_width, i| {
+            let (interface, interface_info) = info.by_net_interface.iter().nth(i).unwrap();
+            TimeSeries {
+                name: interface,
+                max_y: f64::INFINITY,
+                kind: TimeSeriesKind::GridCell {
+                    width: grid_cell_width,
+                },
+                value_kind: ValueKind::Bytes,
+            }
+            .render(
+                ui,
+                &[
+                    (&format!("{interface} receive"), &interface_info.rx),
+                    (&format!("{interface} transmit"), &interface_info.tx),
+                ],
+            );
+        },
+    };
+    const GPU: Self = Self {
+        heading: "GPU View",
+        main_series: &[|ui, info| {
+            TimeSeries {
+                name: "GPU BUSY",
+                max_y: info.by_gpu.len() as f64,
+                kind: TimeSeriesKind::Primary,
+                value_kind: ValueKind::Percent,
+            }
+            .render(
+                ui,
+                &[
+                    ("GPU busy", &info.total_gpu.gpu_busy),
+                    ("VRAM busy", &info.total_gpu.vram_busy),
+                ],
+            );
+        }],
+        grid_name: "gpu-grid",
+        grid_series: |ui, info, grid_cell_width, i| match i {
+            0 => TimeSeries {
                 name: "GPU VRAM",
                 max_y: f64::INFINITY,
                 kind: TimeSeriesKind::GridCell {
@@ -383,8 +404,9 @@ impl Page {
                 },
                 value_kind: ValueKind::Bytes,
             }
-            .render(ui, &[("VRAM usage", &info.total_gpu.vram_used)]);
-            TimeSeries {
+            .render(ui, &[("VRAM usage", &info.total_gpu.vram_used)]),
+
+            1 => TimeSeries {
                 name: "GPU TEMP",
                 max_y: f64::INFINITY,
                 kind: TimeSeriesKind::GridCell {
@@ -392,7 +414,8 @@ impl Page {
                 },
                 value_kind: ValueKind::Temperature,
             }
-            .render(ui, &[("Max temperature", &info.total_gpu.max_temperature)]);
-        });
-    }
+            .render(ui, &[("Max temperature", &info.total_gpu.max_temperature)]),
+            other => unreachable!("{}", other),
+        },
+    };
 }
