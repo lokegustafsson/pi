@@ -53,11 +53,13 @@
 
           LD_LIBRARY_PATH = let p = pkgs;
           in lib.makeLibraryPath [
+            p.libglvnd
+            p.libxkbcommon
+            p.wayland
             p.xorg.libX11
             p.xorg.libXcursor
             p.xorg.libXi
             p.xorg.libXrandr
-            p.libglvnd
           ];
         };
 
