@@ -29,11 +29,13 @@
           extra-overrides = { mkNativeDep, mkEnvDep, mkRpath, mkOverride, p }:
             [
               (mkRpath "pi" [
+                p.libglvnd
+                p.libxkbcommon
+                p.wayland
                 p.xorg.libX11
                 p.xorg.libXcursor
                 p.xorg.libXi
                 p.xorg.libXrandr
-                p.libglvnd
               ])
             ];
         };
@@ -50,17 +52,6 @@
             git rev-parse --is-inside-work-tree > /dev/null && \
             export CARGO_TARGET_DIR="$HOME/cargo-target-dir$(git rev-parse --show-toplevel)"
           '';
-
-          LD_LIBRARY_PATH = let p = pkgs;
-          in lib.makeLibraryPath [
-            p.libglvnd
-            p.libxkbcommon
-            p.wayland
-            p.xorg.libX11
-            p.xorg.libXcursor
-            p.xorg.libXi
-            p.xorg.libXrandr
-          ];
         };
 
         packages.default = rust.pi;

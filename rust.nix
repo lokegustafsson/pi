@@ -28,13 +28,20 @@ let
         mkRpath = cratename: libs:
           p.rustBuilder.rustLib.makeOverride {
             name = cratename;
-            overrideAttrs = drv: {
-              postFixup = let libPath = lib.makeLibraryPath libs;
-              in ''
-                patchelf --add-rpath "${libPath}" $out/bin/${cratename}
-                patchelf --add-rpath "${libPath}" $bin/bin/${cratename}
-              '';
-            };
+            overrideAttrs = drv:
+              let libPath = lib.makeLibraryPath libs;
+              in {
+                postFixup = ''
+                  patchelf --add-rpath "${libPath}" $out/bin/${cratename}
+                  patchelf --add-rpath "${libPath}" $bin/bin/${cratename}
+                '';
+                propagatedBuildInputs = (drv.propagatedBuildInputs or [ ]) ++ [
+                  (p.rustBuilder.overrides.patches.propagateEnv cratename [{
+                    name = "LD_LIBRARY_PATH";
+                    value = libPath;
+                  }])
+                ];
+              };
           };
         mkOverride = cratename: overrideAttrs:
           p.rustBuilder.rustLib.makeOverride {
