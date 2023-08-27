@@ -5,6 +5,7 @@ use crate::{
     process::ProcessTab,
     system::{SystemNavigation, SystemTab},
 };
+use clap::{Parser, Subcommand};
 use eframe::egui::{self, Ui};
 use ingest::Ingester;
 use tracing_subscriber::Layer;
@@ -13,7 +14,24 @@ mod process;
 mod show;
 mod system;
 
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    focus: Option<Focus>,
+}
+#[derive(Subcommand)]
+enum Focus {
+    Cpu,
+    Ram,
+    Disk,
+    Net,
+    Gpu,
+}
+
 fn main() -> Result<(), eframe::Error> {
+    let cli = Cli::parse();
+
     tracing::subscriber::set_global_default(
         tracing_subscriber::filter::targets::Targets::new()
             .with_target("eframe::native::run", tracing::Level::INFO)
@@ -34,12 +52,22 @@ fn main() -> Result<(), eframe::Error> {
             default_theme: eframe::Theme::Light,
             ..Default::default()
         },
-        Box::new(|_| {
+        Box::new(move |_| {
             Box::new(State {
                 nav: Navigation {
-                    tab: NavigationTab::Process,
+                    tab: if cli.focus.is_some() {
+                        NavigationTab::System
+                    } else {
+                        NavigationTab::Process
+                    },
                     process: (),
-                    system: SystemNavigation::Cpu,
+                    system: match cli.focus {
+                        Some(Focus::Cpu) | None => SystemNavigation::Cpu,
+                        Some(Focus::Ram) => SystemNavigation::Ram,
+                        Some(Focus::Disk) => SystemNavigation::Disk,
+                        Some(Focus::Net) => SystemNavigation::Net,
+                        Some(Focus::Gpu) => SystemNavigation::Gpu,
+                    },
                 },
                 ingester: Ingester::new(),
             })
