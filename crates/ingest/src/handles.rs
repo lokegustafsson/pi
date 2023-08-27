@@ -79,7 +79,9 @@ impl Handles {
                 let mut ret = Vec::new();
                 for hwmon in read_dir("/sys/class/hwmon") {
                     let path = hwmon.path();
-                    if fs::read_to_string(path.join("name")).unwrap() == "k10temp\n" {
+                    if ["k10temp\n", "coretemp\n"]
+                        .contains(&fs::read_to_string(path.join("name")).unwrap().as_ref())
+                    {
                         ret.extend(hwmon_get_temps(&path));
                     }
                 }
