@@ -45,6 +45,10 @@
             p.rust-bin.stable.latest.clippy
             p.rust-bin.stable.latest.default
           ];
+          shellHook = ''
+            git rev-parse --is-inside-work-tree > /dev/null && \
+            export CARGO_TARGET_DIR="$HOME/cargo-target-dir$(git rev-parse --show-toplevel)"
+          '';
 
           LD_LIBRARY_PATH = let p = pkgs;
           in lib.makeLibraryPath [
