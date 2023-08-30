@@ -130,6 +130,7 @@ impl Snapshot {
 }
 
 #[derive(Clone, Debug)]
+#[allow(unused)]
 pub struct DiskStats {
     major_device_number: u16,
     pub minor_device_number: u16,

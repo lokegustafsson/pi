@@ -3,7 +3,7 @@ use crate::{
     system::time_series::{TimeSeries, TimeSeriesKind, ValueKind},
     Component,
 };
-use eframe::egui::{self, Align, Frame, Grid, Label, Layout, Sense, Ui, Vec2};
+use eframe::egui::{self, Align, Frame, Grid, Id, Label, Layout, Sense, Stroke, Ui, Vec2};
 use ingest::{Series, SystemInfo};
 
 mod time_series;
@@ -166,10 +166,11 @@ fn left_panel_item(
     nav: &mut SystemNavigation,
     value: SystemNavigation,
     series: &[(&str, &Series<f64>)],
-    time_series: TimeSeries,
+    time_series: TimeSeries<'_>,
 ) {
     let selected = *nav == value;
-    let resp = ui
+    let focused = ui.memory(|m| m.has_focus(Id::new(time_series.name).with("interact")));
+    let rect = ui
         .push_id(time_series.name, |ui| {
             ui.allocate_ui(size, |ui| {
                 Frame::none()
@@ -179,6 +180,13 @@ fn left_panel_item(
                         match selected {
                             true => visuals.selection.bg_fill,
                             false => visuals.window_fill,
+                        }
+                    })
+                    .stroke({
+                        let visuals = ui.visuals();
+                        match focused {
+                            true => visuals.selection.stroke,
+                            false => Stroke::default(),
                         }
                     })
                     .show(ui, |ui| {
@@ -202,7 +210,17 @@ fn left_panel_item(
                     });
             })
         })
-        .response;
+        .response
+        .rect;
+    let resp = ui.interact(
+        rect,
+        Id::new(time_series.name).with("interact"),
+        Sense {
+            click: true,
+            drag: false,
+            focusable: true,
+        },
+    );
     if resp.interact(Sense::click()).clicked() {
         *nav = value;
     }

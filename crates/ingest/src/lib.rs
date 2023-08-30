@@ -2,10 +2,7 @@ use crate::{
     handles::Handles,
     snapshot::{OldSnapshot, Snapshot},
 };
-use std::{
-    collections::VecDeque,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 mod handles;
 mod process;
@@ -15,7 +12,7 @@ mod system;
 pub use process::ProcessInfo;
 pub use system::SystemInfo;
 
-pub const SUBSEC: u64 = 30;
+pub const SUBSEC: u64 = 60;
 pub const TICK_DELAY: Duration = Duration::from_micros(1_000_000 / SUBSEC);
 pub const HISTORY: usize = (60 * SUBSEC + 1) as usize;
 
@@ -71,24 +68,48 @@ impl Ingester {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct Series<T: Copy + Default> {
-    inner: VecDeque<T>,
+    inner: Box<[T; HISTORY]>,
+    last: usize,
+}
+impl<T: Copy + Default> Default for Series<T> {
+    fn default() -> Self {
+        Self {
+            inner: Box::new([T::default(); HISTORY]),
+            last: HISTORY - 1,
+        }
+    }
 }
 impl<T: Copy + Default> Series<T> {
     fn push(&mut self, item: T) {
-        while self.inner.len() >= HISTORY {
-            self.inner.pop_front();
+        self.last += 1;
+        if self.last == HISTORY {
+            self.last = 0;
         }
-        self.inner.push_back(item);
+        self.inner[self.last] = item;
     }
-    pub fn len(&self) -> usize {
-        self.inner.len()
+    pub fn capacity() -> usize {
+        HISTORY
     }
     pub fn latest(&self) -> T {
-        *self.inner.back().unwrap()
+        self.inner[self.last]
     }
-    pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, T> {
-        self.inner.iter()
+    pub fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = T> {
+        Iterator::chain(
+            self.inner[(self.last + 1)..].iter().copied(),
+            self.inner[..(self.last + 1)].iter().copied(),
+        )
+    }
+    pub fn chunks<'a>(
+        &'a self,
+        chunk_size: usize,
+    ) -> (&'a [T], impl Iterator<Item = &'a [T]>, &'a [T]) {
+        let tail = self.inner[(self.last + 1)..].rchunks_exact(chunk_size);
+        let head = self.inner[..(self.last + 1)].chunks_exact(chunk_size);
+        let first_chunk = tail.remainder();
+        let last_chunk = head.remainder();
+        let iterator = tail.rev().chain(head);
+        (first_chunk, iterator, last_chunk)
     }
 }

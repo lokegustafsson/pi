@@ -1,7 +1,7 @@
 use crate::show::Show;
 use eframe::egui::{
-    plot::{Corner, Legend, Line, Plot, PlotPoints},
-    Ui,
+    plot::{Corner, Legend, Line, Plot},
+    Frame, Id, Stroke, Ui,
 };
 use ingest::{Series, HISTORY, TICK_DELAY};
 use std::ops::RangeInclusive;
@@ -28,62 +28,84 @@ impl<'a> TimeSeries<'a> {
     pub fn render(&self, ui: &mut Ui, series: &[(&str, &Series<f64>)]) {
         let series_max_y = series
             .iter()
-            .map(|(_, series)| series.iter().copied().max_by(f64::total_cmp).unwrap())
+            .map(|(_, series)| series.iter().max_by(f64::total_cmp).unwrap())
             .reduce(f64::max)
             .unwrap();
-        Plot::new(self.name)
-            .view_aspect(match self.kind {
-                TimeSeriesKind::Preview | TimeSeriesKind::Primary => 1.6,
-                TimeSeriesKind::GridCell { .. } => 1.0,
+        Frame::none()
+            .stroke(match ui.memory(|m| m.has_focus(Id::new(self.name))) {
+                false => Stroke::NONE,
+                true => ui.visuals().selection.stroke,
             })
-            .with_prop(
-                match self.kind {
-                    TimeSeriesKind::GridCell { width } => Some(width),
-                    _ => None,
-                },
-                |plot, width| plot.width(width),
-            )
-            .show_x(false)
-            .show_y(false)
-            .allow_zoom(false)
-            .allow_scroll(false)
-            .allow_drag(false)
-            .include_x(-((HISTORY - 1) as f64) * TICK_DELAY.as_secs_f64())
-            .include_x(0)
-            .include_y(0)
-            .include_y(self.max_y.min(1.2 * series_max_y))
-            .sharp_grid_lines(false)
-            .y_axis_formatter(match self.value_kind {
-                ValueKind::Bytes => |val, range: &RangeInclusive<f64>| {
-                    let maximum = *range.end();
-                    Show::size_at_scale(val, maximum)
-                },
-                ValueKind::Percent => |val, _: &_| format!("{:.0}%", 100.0 * val),
-                ValueKind::Temperature => |val, _: &_| format!("{val}°C"),
-            })
-            .with_prop(
-                match self.kind {
-                    TimeSeriesKind::Preview => None,
-                    TimeSeriesKind::Primary | TimeSeriesKind::GridCell { .. } => Some(()),
-                },
-                |plot, ()| plot.legend(Legend::default().position(Corner::LeftTop)),
-            )
             .show(ui, |ui| {
-                for (name, series) in series {
-                    let points: PlotPoints = series
-                        .iter()
-                        .enumerate()
-                        .map(|(i, &y)| {
-                            [
-                                (i as f64 - (series.len() - 1) as f64) * TICK_DELAY.as_secs_f64(),
-                                y,
-                            ]
-                        })
-                        .collect();
-                    ui.line(Line::new(points).name(name));
-                }
-            })
-            .response;
+                let plot_width_pixels = ui.ctx().pixels_per_point() * ui.available_width();
+                Plot::new(self.name)
+                    .view_aspect(match self.kind {
+                        TimeSeriesKind::Preview | TimeSeriesKind::Primary => 1.6,
+                        TimeSeriesKind::GridCell { .. } => 1.0,
+                    })
+                    .with_prop(
+                        match self.kind {
+                            TimeSeriesKind::GridCell { width } => Some(width),
+                            _ => None,
+                        },
+                        |plot, width| plot.width(width),
+                    )
+                    .show_x(false)
+                    .show_y(false)
+                    .allow_zoom(false)
+                    .allow_scroll(false)
+                    .allow_drag(false)
+                    .include_x(-((HISTORY - 1) as f64) * TICK_DELAY.as_secs_f64())
+                    .include_x(0)
+                    .include_y(0)
+                    .include_y(self.max_y.min(1.2 * series_max_y))
+                    .sharp_grid_lines(false)
+                    .y_axis_formatter(match self.value_kind {
+                        ValueKind::Bytes => |val, range: &RangeInclusive<f64>| {
+                            let maximum = *range.end();
+                            Show::size_at_scale(val, maximum)
+                        },
+                        ValueKind::Percent => |val, _: &_| format!("{:.0}%", 100.0 * val),
+                        ValueKind::Temperature => |val, _: &_| format!("{val}°C"),
+                    })
+                    .with_prop(
+                        match self.kind {
+                            TimeSeriesKind::Preview => None,
+                            TimeSeriesKind::Primary | TimeSeriesKind::GridCell { .. } => Some(()),
+                        },
+                        |plot, ()| plot.legend(Legend::default().position(Corner::LeftTop)),
+                    )
+                    .show(ui, |ui| {
+                        for (name, series) in series {
+                            let chunk_size =
+                                (Series::<f64>::capacity() as f32 / plot_width_pixels) as usize;
+                            let (first, middle, last) = series.chunks(chunk_size);
+                            let mut points = Vec::new();
+                            let max = |slice: &'_ [f64]| {
+                                slice.iter().copied().max_by(f64::total_cmp).unwrap_or(0.0)
+                            };
+                            if !first.is_empty() {
+                                points.push([
+                                    -(HISTORY as f64 * TICK_DELAY.as_secs_f64()),
+                                    max(first),
+                                ]);
+                            }
+                            points.extend(middle.enumerate().map(|(i, m)| {
+                                [
+                                    -((HISTORY - first.len() - chunk_size * (i + 1)) as f64)
+                                        * (TICK_DELAY.as_secs_f64() * HISTORY as f64
+                                            / (HISTORY - chunk_size) as f64),
+                                    max(m),
+                                ]
+                            }));
+                            if !last.is_empty() {
+                                points.push([0.0, max(last)]);
+                            }
+                            ui.line(Line::new(points).name(name));
+                        }
+                    })
+                    .response
+            });
     }
 }
 

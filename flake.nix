@@ -37,6 +37,9 @@
                 p.xorg.libXi
                 p.xorg.libXrandr
               ])
+            (mkOverride "egui" (old: {
+              patches = (old.patches or []) ++ [./egui_nodrag_plot.patch ];
+            }))
             ];
         };
       in {
