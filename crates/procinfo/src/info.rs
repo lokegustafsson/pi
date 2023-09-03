@@ -103,7 +103,7 @@ impl ProcInfo {
                         system_time_millis: thread.system_time_ms,
                         disk_read_bytes_per_second: thread.read_bytes / self.update_hz as u64,
                         disk_write_bytes_per_second: thread.write_bytes / self.update_hz as u64,
-                        mem_bytes: process.vm_rss_bytes,
+                        mem_bytes: process.vm_rss_kb * 1024,
                     },
                 });
             }
@@ -118,7 +118,7 @@ impl ProcInfo {
                         .iter()
                         .map(|thread| thread.stat)
                         .fold(ProcStat::ZERO, ProcStat::add);
-                    stat.mem_bytes = process.vm_rss_bytes;
+                    stat.mem_bytes = process.vm_rss_kb * 1024;
                     stat
                 },
             });

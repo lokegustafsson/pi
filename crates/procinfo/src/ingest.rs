@@ -1,6 +1,6 @@
 use crate::procfs;
-use std::{collections::BTreeMap, process::Command};
 use either::Either;
+use std::{collections::BTreeMap, process::Command};
 
 pub struct ProcIngest {
     pub by_pid: BTreeMap<u32, ProcessIngest>,
@@ -13,7 +13,7 @@ pub struct ProcessIngest {
     pub status: procfs::PidStatus,
     pub uid: u16,
     pub gid: u16,
-    pub vm_rss_bytes: u64,
+    pub vm_rss_kb: u64,
 }
 pub struct ThreadIngest {
     /// Sometimes requires `PTRACE_MODE_READ_FSCREDS`.
@@ -73,10 +73,10 @@ impl ProcessIngest {
                 status: procfs::PidStatus::new(pid, kernel),
                 uid: 0,
                 gid: 0,
-                vm_rss_bytes: 0,
+                vm_rss_kb: 0,
             })
         })?;
-        let (uid, gid, vm_rss_bytes, threads) = old.status.get_uid_gid_vm_rss_bytes_threads()?;
+        let (uid, gid, vm_rss_kb, threads) = old.status.get_uid_gid_vm_rss_kb_threads()?;
         Some(ProcessIngest {
             kernel: old.kernel,
             cmdline: old.cmdline,
@@ -84,7 +84,7 @@ impl ProcessIngest {
             status: old.status,
             uid: uid as u16,
             gid: gid as u16,
-            vm_rss_bytes,
+            vm_rss_kb,
         })
     }
 }

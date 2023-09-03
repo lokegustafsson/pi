@@ -41,10 +41,10 @@ impl PidStatus {
             is_kernel,
         }
     }
-    pub fn get_uid_gid_vm_rss_bytes_threads(&mut self) -> Option<(u16, u16, u64, u32)> {
+    pub fn get_uid_gid_vm_rss_kb_threads(&mut self) -> Option<(u16, u16, u64, u32)> {
         let mut uid = 0;
         let mut gid = 0;
-        let mut vm_rss_bytes = 0;
+        let mut vm_rss_kb = 0;
         let mut threads = 0;
         TextualKeyValue::extract_from(
             &mut [
@@ -58,7 +58,7 @@ impl PidStatus {
                 }),
                 (!self.is_kernel).then_some(TextualKeyValue {
                     key: "VmRSS",
-                    value: &mut vm_rss_bytes,
+                    value: &mut vm_rss_kb,
                 }),
                 Some(TextualKeyValue {
                     key: "Threads",
@@ -67,7 +67,7 @@ impl PidStatus {
             ],
             &read_file_to_string(&mut self.file, &mut [0u8; 4096])?,
         )?;
-        Some((uid as u16, gid as u16, vm_rss_bytes, threads as u32))
+        Some((uid as u16, gid as u16, vm_rss_kb, threads as u32))
     }
 }
 
