@@ -38,11 +38,17 @@ pub struct TextualKeyValue<'a> {
     pub value: &'a mut u64,
 }
 impl<'a> TextualKeyValue<'a> {
-    pub fn extract_from(schema: &mut [Option<Self>], data: &str) {
+    pub fn extract_from(schema: &mut [Option<Self>], data: &str) -> Option<()> {
         let mut lines = data.lines();
         for TextualKeyValue { key, value } in schema.iter_mut().filter_map(|x| x.as_mut()) {
             loop {
-                let line = lines.next().expect("key missing in data");
+                let line = match lines.next() {
+                    Some(line) => line,
+                    None => {
+                        tracing::warn!("key missing in data");
+                        return None;
+                    }
+                };
                 if let Some(line) = line.strip_prefix(*key) {
                     **value = line
                         .strip_prefix(":")
@@ -58,5 +64,6 @@ impl<'a> TextualKeyValue<'a> {
                 }
             }
         }
+        Some(())
     }
 }

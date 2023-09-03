@@ -47,6 +47,7 @@
           packages = let p = pkgs;
           in [
             cargo2nix.outputs.packages.${system}.cargo2nix
+            p.cargo-flamegraph
             p.rust-bin.stable.latest.clippy
             p.rust-bin.stable.latest.default
             p.rust-bin.stable.latest.rust-analyzer

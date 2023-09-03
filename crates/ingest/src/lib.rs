@@ -1,7 +1,7 @@
 use procinfo::{ProcInfo, ProcIngest};
 use std::time::{Duration, Instant};
 use sysinfo::{SysHandles, SysInfo, SysOldSnapshot, SysSnapshot};
-use util::{TICK_DELAY};
+use util::TICK_DELAY;
 
 pub struct Ingester {
     next_update_instant: Instant,
@@ -21,13 +21,15 @@ impl Ingester {
         let mut sys_handles = SysHandles::new();
         let sys_old_snapshot = SysSnapshot::new(&mut scratch_buf, &mut sys_handles).retire();
 
+        let proc_ingest = ProcIngest::new(&mut scratch_buf);
+
         Self {
             next_update_instant: Instant::now(),
             scratch_buf,
             sys_handles,
             sys_old_snapshot,
             sys_info: SysInfo::default(),
-            proc_ingest: ProcIngest::new(),
+            proc_ingest,
             proc_info: ProcInfo::new(),
         }
     }
@@ -42,6 +44,7 @@ impl Ingester {
             .saturating_duration_since(Instant::now())
     }
     fn tick_update(&mut self) {
+        let now = std::time::Instant::now();
         // Possibly refresh handles (added/removed interfaces/disk/etc)
         self.sys_handles.update();
 
@@ -52,8 +55,9 @@ impl Ingester {
         self.sys_info.update(&new, &self.sys_old_snapshot);
         self.sys_old_snapshot = new.retire();
 
-        //self.proc_ingest.update();
-        //self.proc_info.update(&self.proc_ingest);
+        self.proc_ingest.update(&mut self.scratch_buf);
+        self.proc_info.update(&self.proc_ingest);
+        println!("updated in {}ms", now.elapsed().as_millis());
     }
     pub fn process_info(&self) -> &ProcInfo {
         &self.proc_info
