@@ -1,5 +1,6 @@
 use crate::procfs;
 use std::{collections::BTreeMap, process::Command};
+use either::Either;
 
 pub struct ProcIngest {
     pub by_pid: BTreeMap<u32, ProcessIngest>,
@@ -32,7 +33,7 @@ pub struct ThreadIngest {
     pub guest_time_ms: u32,
 }
 impl ProcIngest {
-    pub fn new(scratch: &mut String) -> Self {
+    pub fn new() -> Self {
         let user_hz: u32 = {
             let output = Command::new("getconf").arg("CLK_TCK").output().unwrap();
             assert!(output.status.success());
@@ -47,23 +48,22 @@ impl ProcIngest {
         let mut ret = Self {
             by_pid: BTreeMap::new(),
         };
-        ret.update(scratch);
+        ret.update();
         ret
     }
-    pub fn update(&mut self, scratch: &mut String) {
+    pub fn update(&mut self) {
         self.by_pid = procfs::get_live_pids()
             .filter_map(|pid| {
                 Some((
                     pid,
-                    ProcessIngest::new_from_old(pid, self.by_pid.remove(&pid), scratch)?,
+                    ProcessIngest::new_from_old(pid, self.by_pid.remove(&pid))?,
                 ))
             })
             .collect();
-        scratch.clear();
     }
 }
 impl ProcessIngest {
-    fn new_from_old(pid: u32, old: Option<Self>, scratch: &mut String) -> Option<Self> {
+    fn new_from_old(pid: u32, old: Option<Self>) -> Option<Self> {
         let mut old = old.or_else(|| {
             let (kernel, cmdline) = procfs::get_is_kernel_and_cmdline(pid)?;
             Some(Self {
@@ -76,11 +76,11 @@ impl ProcessIngest {
                 vm_rss_bytes: 0,
             })
         })?;
-        let (uid, gid, vm_rss_bytes) = old.status.get_uid_gid_vm_rss_bytes(scratch)?;
+        let (uid, gid, vm_rss_bytes, threads) = old.status.get_uid_gid_vm_rss_bytes_threads()?;
         Some(ProcessIngest {
             kernel: old.kernel,
             cmdline: old.cmdline,
-            by_tid: ThreadIngest::new_by_tid(pid, old.by_tid, scratch)?,
+            by_tid: ThreadIngest::new_by_tid(pid, old.by_tid, threads == 1)?,
             status: old.status,
             uid: uid as u16,
             gid: gid as u16,
@@ -92,10 +92,13 @@ impl ThreadIngest {
     fn new_by_tid(
         pid: u32,
         mut old: BTreeMap<u32, ThreadIngest>,
-        scratch: &mut String,
+        single_threaded: bool,
     ) -> Option<BTreeMap<u32, ThreadIngest>> {
         let mut ret = BTreeMap::new();
-        for tid in procfs::get_live_tids(pid) {
+        for tid in match single_threaded {
+            true => Either::Left([pid].into_iter()),
+            false => Either::Right(procfs::get_live_tids(pid)),
+        } {
             let mut old = old.remove(&tid).unwrap_or_else(|| ThreadIngest {
                 io: procfs::TidIo::new(pid, tid),
                 cumulative_read_bytes: 0,
@@ -112,13 +115,12 @@ impl ThreadIngest {
                 guest_time_ms: 0,
             });
             let (cumulative_read_bytes, cumulative_write_bytes) = match old.io.as_mut() {
-                Some(io) => io.get_cumulative_read_write_bytes(scratch)?,
+                Some(io) => io.get_cumulative_read_write_bytes()?,
                 None => (0, 0),
             };
 
             let (sid, cumulative_user_time_ms, cumulative_system_time_ms, cumulative_guest_time_ms) =
-                old.stat
-                    .get_sid_cumulative_user_system_guest_time(scratch)?;
+                old.stat.get_sid_cumulative_user_system_guest_time()?;
             ret.insert(
                 tid,
                 ThreadIngest {

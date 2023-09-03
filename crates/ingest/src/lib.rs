@@ -21,7 +21,7 @@ impl Ingester {
         let mut sys_handles = SysHandles::new();
         let sys_old_snapshot = SysSnapshot::new(&mut scratch_buf, &mut sys_handles).retire();
 
-        let proc_ingest = ProcIngest::new(&mut scratch_buf);
+        let proc_ingest = ProcIngest::new();
 
         Self {
             next_update_instant: Instant::now(),
@@ -55,7 +55,7 @@ impl Ingester {
         self.sys_info.update(&new, &self.sys_old_snapshot);
         self.sys_old_snapshot = new.retire();
 
-        self.proc_ingest.update(&mut self.scratch_buf);
+        self.proc_ingest.update();
         self.proc_info.update(&self.proc_ingest);
         println!("updated in {}ms", now.elapsed().as_millis());
     }

@@ -1,3 +1,4 @@
+use nix::errno::Errno;
 use std::{
     fs::{self, DirEntry, File},
     io,
@@ -40,10 +41,11 @@ impl PidStatus {
             is_kernel,
         }
     }
-    pub fn get_uid_gid_vm_rss_bytes(&mut self, scratch: &mut String) -> Option<(u16, u16, u64)> {
+    pub fn get_uid_gid_vm_rss_bytes_threads(&mut self) -> Option<(u16, u16, u64, u32)> {
         let mut uid = 0;
         let mut gid = 0;
         let mut vm_rss_bytes = 0;
+        let mut threads = 0;
         TextualKeyValue::extract_from(
             &mut [
                 Some(TextualKeyValue {
@@ -58,10 +60,14 @@ impl PidStatus {
                     key: "VmRSS",
                     value: &mut vm_rss_bytes,
                 }),
+                Some(TextualKeyValue {
+                    key: "Threads",
+                    value: &mut threads,
+                }),
             ],
-            &read_file_to_string(&mut self.file, scratch)?,
+            &read_file_to_string(&mut self.file, &mut [0u8; 4096])?,
         )?;
-        Some((uid as u16, gid as u16, vm_rss_bytes))
+        Some((uid as u16, gid as u16, vm_rss_bytes, threads as u32))
     }
 }
 
@@ -77,7 +83,7 @@ impl TidIo {
         };
         can_read_from(&mut file).then_some(Self { file })
     }
-    pub fn get_cumulative_read_write_bytes(&mut self, scratch: &mut String) -> Option<(u64, u64)> {
+    pub fn get_cumulative_read_write_bytes(&mut self) -> Option<(u64, u64)> {
         let mut cumulative_read_bytes = 0;
         let mut cumulative_write_bytes = 0;
         TextualKeyValue::extract_from(
@@ -91,7 +97,7 @@ impl TidIo {
                     value: &mut cumulative_write_bytes,
                 }),
             ],
-            &read_file_to_string(&mut self.file, scratch)?,
+            &read_file_to_string(&mut self.file, &mut [0u8; 4096])?,
         )?;
         Some((cumulative_read_bytes, cumulative_write_bytes))
     }
@@ -106,11 +112,9 @@ impl TidStat {
             file: File::open(format!("/proc/{pid}/task/{tid}/stat")).unwrap(),
         })
     }
-    pub fn get_sid_cumulative_user_system_guest_time(
-        &mut self,
-        scratch: &mut String,
-    ) -> Option<(u32, u64, u64, u64)> {
-        let stat_data = read_file_to_string(&mut self.file, scratch)?;
+    pub fn get_sid_cumulative_user_system_guest_time(&mut self) -> Option<(u32, u64, u64, u64)> {
+        let buf = &mut [0u8; 4096];
+        let stat_data = read_file_to_string(&mut self.file, buf)?;
         let mut stat_entries = stat_data.split(' ');
         let sid = stat_entries.nth(5).unwrap().parse().unwrap();
         let cumulative_user_time_ms = stat_entries.nth(7).unwrap().parse::<u64>().unwrap() * 10;
@@ -132,30 +136,17 @@ fn read_dir(path: impl AsRef<Path>) -> impl Iterator<Item = DirEntry> {
     fs::read_dir(path).unwrap().map(|entry| entry.unwrap())
 }
 fn read_to_string(path: impl AsRef<Path>) -> Option<String> {
-    match fs::read_to_string(path) {
-        Ok(s) => Some(s),
-        Err(err) if err.kind() == io::ErrorKind::NotFound => None,
-        Err(err) => panic!("{}", err),
-    }
+    let mut file = File::open(path).ok()?;
+    Some(read_file_to_string(&mut file, &mut [0u8; 4096])?.to_owned())
 }
-fn read_file_to_string<'a>(file: &mut File, scratch: &'a mut String) -> Option<&'a str> {
-    use std::io::{Read, Seek};
-    const ESRCH_NO_SUCH_PROCESS: i32 = 3;
-
-    scratch.clear();
-    match file.read_to_string(scratch) {
-        Ok(_) => {
-            file.rewind().unwrap();
-            Some(&*scratch)
-        }
-        Err(err) if err.raw_os_error() == Some(ESRCH_NO_SUCH_PROCESS) => None,
-        Err(err) => panic!("{}", err),
+fn read_file_to_string<'a>(file: &mut File, buf: &'a mut [u8; 4096]) -> Option<&'a str> {
+    // For performance reasons, we assume that read returns the entire (tiny, <4K) file.
+    match nix::sys::uio::pread(file, buf, 0) {
+        Ok(len) => Some(std::str::from_utf8(&buf[..len]).unwrap()),
+        Err(Errno::ENOENT | Errno::ESRCH | Errno::EACCES) => None,
+        Err(other) => panic!("{other}"),
     }
 }
 fn can_read_from(file: &mut File) -> bool {
-    use std::io::{Read, Seek};
-    let mut buf: &mut [u8] = &mut [0u8];
-    let ret = file.read(&mut buf).is_ok();
-    file.rewind().unwrap();
-    ret
+    read_file_to_string(file, &mut [0u8; 4096]).is_some()
 }
