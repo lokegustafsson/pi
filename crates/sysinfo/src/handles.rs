@@ -14,7 +14,7 @@ use std::{
 ///
 /// Also
 /// - `/sys/class/hwmon/*/name`
-pub struct Handles {
+pub struct SysHandles {
     /// `/proc/diskstats`
     pub diskstats: File,
     /// `/proc/meminfo`
@@ -53,7 +53,7 @@ pub struct GpuHandles {
     /// `/sys/class/hwmon/{num}/temp*_input
     pub temperatures: Vec<File>,
 }
-impl Handles {
+impl SysHandles {
     pub fn new() -> Self {
         let user_hz: u32 = {
             let output = Command::new("getconf").arg("CLK_TCK").output().unwrap();

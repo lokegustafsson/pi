@@ -1,11 +1,11 @@
 use crate::Component;
 use eframe::egui::Ui;
-use ingest::ProcessInfo;
+use procinfo::ProcInfo;
 
 pub struct ProcessTab;
 impl Component for ProcessTab {
     type Navigation = ();
-    type Info = ProcessInfo;
+    type Info = ProcInfo;
     fn render(ui: &mut Ui, _: &mut Self::Navigation, info: &Self::Info) {
         ui.heading("Process table");
         let s = format!("{info:#?}");

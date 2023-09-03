@@ -3,8 +3,9 @@ use eframe::egui::{
     plot::{Corner, Legend, Line, Plot},
     Frame, Id, Stroke, Ui,
 };
-use ingest::{Series, HISTORY, TICK_DELAY};
 use std::ops::RangeInclusive;
+use sysinfo::Series;
+use util::{HISTORY, TICK_DELAY};
 
 pub struct TimeSeries<'a> {
     pub name: &'a str,

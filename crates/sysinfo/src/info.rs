@@ -1,11 +1,14 @@
 use crate::{
-    snapshot::{CpuStat, DiskStats, GpuSnapshot, NetInterfaceSnapshot, OldSnapshot, Snapshot},
-    Series, SUBSEC,
+    snapshot::{
+        CpuStat, DiskStats, GpuSnapshot, NetInterfaceSnapshot, SysOldSnapshot, SysSnapshot,
+    },
+    Series,
 };
 use std::{collections::BTreeMap, time::Duration};
+use util::{WindowMovingAverage, SUBSEC};
 
 #[derive(Default, Debug)]
-pub struct SystemInfo {
+pub struct SysInfo {
     pub global: GlobalInfo,
     pub by_cpu: Vec<CpuInfo>,
     pub total_cpu: CpuInfo,
@@ -68,8 +71,8 @@ pub struct GpuInfo {
     pub gpu_busy: Series<f64>,
     pub max_temperature: Series<f64>,
 }
-impl SystemInfo {
-    pub(crate) fn update(&mut self, new: &Snapshot, old: &OldSnapshot) {
+impl SysInfo {
+    pub fn update(&mut self, new: &SysSnapshot, old: &SysOldSnapshot) {
         self.global.update(new);
 
         CpuInfo::update_all(&mut self.by_cpu, &new.cpus_stat, &old.cpus_stat);
@@ -101,7 +104,7 @@ impl SystemInfo {
     }
 }
 impl GlobalInfo {
-    fn update(&mut self, new: &Snapshot) {
+    fn update(&mut self, new: &SysSnapshot) {
         self.mem_total = 1024.0 * new.mem_info.mem_total as f64;
         self.swap_total = 1024.0 * new.mem_info.swap_total as f64;
         self.mem_inc_reclaimable
@@ -159,7 +162,11 @@ impl CpuInfo {
     }
 }
 impl PartitionInfo {
-    fn update_all(by_partition: &mut BTreeMap<String, Self>, new: &Snapshot, old: &OldSnapshot) {
+    fn update_all(
+        by_partition: &mut BTreeMap<String, Self>,
+        new: &SysSnapshot,
+        old: &SysOldSnapshot,
+    ) {
         intersect_old_new(
             by_partition,
             old.disk_stats
@@ -296,31 +303,3 @@ fn intersect_old_new<'a, T: 'a, U: Default>(
 
 type WindowMovingAverage1s = WindowMovingAverage<{ 1 * SUBSEC as usize }>;
 type WindowMovingAverage5s = WindowMovingAverage<{ 5 * SUBSEC as usize }>;
-
-#[derive(Clone, Debug)]
-pub struct WindowMovingAverage<const WINDOW_SIZE: usize> {
-    i: usize,
-    samples: [f64; WINDOW_SIZE],
-}
-impl<const WINDOW_SIZE: usize> WindowMovingAverage<WINDOW_SIZE> {
-    fn add(&mut self, sample: f64) {
-        self.samples[self.i] = sample;
-        self.i = (self.i + 1) % WINDOW_SIZE;
-    }
-    pub fn get(&self) -> f64 {
-        self.samples.iter().copied().sum::<f64>() / WINDOW_SIZE as f64
-    }
-    #[must_use]
-    fn smooth(&mut self, sample: f64) -> f64 {
-        self.add(sample);
-        self.get()
-    }
-}
-impl<const WINDOW_SIZE: usize> Default for WindowMovingAverage<WINDOW_SIZE> {
-    fn default() -> Self {
-        Self {
-            i: 0,
-            samples: [0.0; WINDOW_SIZE],
-        }
-    }
-}

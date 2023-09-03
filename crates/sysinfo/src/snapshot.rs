@@ -1,4 +1,4 @@
-use crate::Handles;
+use crate::SysHandles;
 use std::{
     collections::BTreeMap,
     convert::Infallible,
@@ -10,7 +10,7 @@ use std::{
 };
 
 #[derive(Clone, Debug)]
-pub struct Snapshot {
+pub struct SysSnapshot {
     pub disk_stats: Vec<DiskStats>,
     pub mem_info: MemInfo,
     pub partition_to_mountpath: PartitionToMountpath,
@@ -34,20 +34,20 @@ pub struct GpuSnapshot {
     pub max_temperature: u32,
 }
 #[derive(Clone, Debug)]
-pub struct OldSnapshot {
+pub struct SysOldSnapshot {
     pub disk_stats: Vec<DiskStats>,
     pub cpus_stat: Vec<CpuStat>,
     pub by_net_interface: BTreeMap<String, NetInterfaceSnapshot>,
 }
-impl Snapshot {
-    pub fn retire(self) -> OldSnapshot {
-        OldSnapshot {
+impl SysSnapshot {
+    pub fn retire(self) -> SysOldSnapshot {
+        SysOldSnapshot {
             disk_stats: self.disk_stats,
             cpus_stat: self.cpus_stat,
             by_net_interface: self.by_net_interface,
         }
     }
-    pub(crate) fn new(scratch_buf: &mut String, handles: &mut Handles) -> Self {
+    pub fn new(scratch_buf: &mut String, handles: &mut SysHandles) -> Self {
         fn parse<F: FromStr>(file: &mut File, scratch_buf: &mut String) -> F
         where
             F::Err: std::fmt::Debug,
@@ -77,7 +77,7 @@ impl Snapshot {
         scratch_buf.clear();
         handles.stat.rewind().unwrap();
 
-        Snapshot {
+        SysSnapshot {
             disk_stats,
             mem_info: parse(&mut handles.meminfo, scratch_buf),
             partition_to_mountpath: parse(&mut handles.mounts, scratch_buf),

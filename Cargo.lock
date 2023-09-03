@@ -765,8 +765,9 @@ dependencies = [
 name = "ingest"
 version = "0.1.0"
 dependencies = [
- "nix 0.26.2",
- "tracing",
+ "procinfo",
+ "sysinfo",
+ "util",
 ]
 
 [[package]]
@@ -1232,8 +1233,11 @@ dependencies = [
  "clap",
  "eframe",
  "ingest",
+ "procinfo",
+ "sysinfo",
  "tracing",
  "tracing-subscriber",
+ "util",
 ]
 
 [[package]]
@@ -1284,6 +1288,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18fb31db3f9bddb2ea821cde30a9f70117e3f119938b5ee630b7403aa6e2ead9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "procinfo"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+ "util",
 ]
 
 [[package]]
@@ -1447,6 +1459,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.1.0"
+dependencies = [
+ "nix 0.26.2",
+ "tracing",
+ "util",
 ]
 
 [[package]]
@@ -1637,6 +1658,10 @@ name = "utf8parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
+
+[[package]]
+name = "util"
+version = "0.1.0"
 
 [[package]]
 name = "valuable"

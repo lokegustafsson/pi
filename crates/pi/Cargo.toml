@@ -8,8 +8,11 @@ edition = "2021"
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 ingest = { path = "../ingest" }
+procinfo = { path = "../procinfo" }
+sysinfo = { path = "../sysinfo" }
 tracing = "0.1"
 tracing-subscriber = "0.3"
+util = { path = "../util" }
 
 [dependencies.eframe]
 version = "0.22"

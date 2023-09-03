@@ -4,11 +4,11 @@ use crate::{
     Component,
 };
 use eframe::egui::{self, Align, Frame, Grid, Id, Label, Layout, Sense, Stroke, Ui, Vec2};
-use ingest::{Series, SystemInfo};
+use sysinfo::{Series, SysInfo};
 
 mod time_series;
 
-const TICK_PER_SEC: f64 = ingest::SUBSEC as f64;
+const TICK_PER_SEC: f64 = util::SUBSEC as f64;
 const MARGIN_PIXELS: f32 = 6.0;
 
 pub struct SystemTab;
@@ -22,8 +22,8 @@ pub enum SystemNavigation {
 }
 impl Component for SystemTab {
     type Navigation = SystemNavigation;
-    type Info = SystemInfo;
-    fn render(ui: &mut Ui, nav: &mut SystemNavigation, info: &SystemInfo) {
+    type Info = SysInfo;
+    fn render(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
         ui.heading("System view");
         egui::SidePanel::left("system-left-panel").show_inside(ui, |ui| {
             side_panel_items(ui, nav, info);
@@ -39,7 +39,7 @@ impl Component for SystemTab {
     }
 }
 
-fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SystemInfo) {
+fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
     let total_cpu = info.total_cpu.slow_total.latest();
     let num_cpu = info.by_cpu.len();
     let mem_used = info.global.mem_used.latest();
@@ -228,12 +228,12 @@ fn left_panel_item(
 
 struct Page {
     heading: &'static str,
-    main_series: &'static [fn(&mut Ui, &SystemInfo)],
+    main_series: &'static [fn(&mut Ui, &SysInfo)],
     grid_name: &'static str,
-    grid_series: fn(&mut Ui, &SystemInfo, f32, usize),
+    grid_series: fn(&mut Ui, &SysInfo, f32, usize),
 }
 impl Page {
-    fn render(&self, ui: &mut Ui, info: &SystemInfo, num_grid_items: usize) {
+    fn render(&self, ui: &mut Ui, info: &SysInfo, num_grid_items: usize) {
         let long_side = (num_grid_items as f64).sqrt().ceil() as usize;
         let margin = ui.available_width() * 0.03;
         let grid_cell_width =
