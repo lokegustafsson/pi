@@ -1522,6 +1522,7 @@ in
     src = fetchCratesIo { inherit name version; sha256 = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"; };
     features = builtins.concatLists [
       [ "default" ]
+      [ "resource" ]
       [ "uio" ]
     ];
     dependencies = {
