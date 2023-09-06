@@ -36,7 +36,7 @@ impl Ingester {
         }
     }
     pub fn poll_update(&mut self) {
-        while Instant::now() >= self.next_update_instant {
+        if Instant::now() >= self.next_update_instant {
             self.next_update_instant += TICK_DELAY;
             self.tick_update();
         }
