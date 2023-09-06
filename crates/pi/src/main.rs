@@ -2,7 +2,7 @@
 compile_error!("pi supports only linux");
 
 use crate::{
-    process::ProcessTab,
+    process::{ProcessNavigation, ProcessTab},
     system::{SystemNavigation, SystemTab},
 };
 use clap::{Parser, Subcommand};
@@ -60,7 +60,7 @@ fn main() -> Result<(), eframe::Error> {
                     } else {
                         NavigationTab::Process
                     },
-                    process: (),
+                    process: ProcessNavigation::LoginSessions,
                     system: match cli.focus {
                         Some(Focus::Cpu) | None => SystemNavigation::Cpu,
                         Some(Focus::Ram) => SystemNavigation::Ram,
@@ -81,7 +81,7 @@ struct State {
 }
 struct Navigation {
     tab: NavigationTab,
-    process: (),
+    process: ProcessNavigation,
     system: SystemNavigation,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -98,14 +98,14 @@ impl eframe::App for State {
                 ui.selectable_value(&mut self.nav.tab, NavigationTab::Process, "Processes");
                 ui.selectable_value(&mut self.nav.tab, NavigationTab::System, "System");
             });
-            egui::ScrollArea::vertical().show(ui, |ui| match self.nav.tab {
+            match self.nav.tab {
                 NavigationTab::Process => {
                     ProcessTab::render(ui, &mut self.nav.process, self.ingester.process_info())
                 }
                 NavigationTab::System => {
                     SystemTab::render(ui, &mut self.nav.system, self.ingester.system_info())
                 }
-            });
+            }
         });
         ctx.request_repaint_after(self.ingester.safe_sleep_duration())
     }
