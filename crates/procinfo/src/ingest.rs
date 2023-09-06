@@ -45,7 +45,12 @@ impl ProcIngest {
         };
         assert_eq!(user_hz, 100);
         let fd_limit = 8196;
-        nix::sys::resource::setrlimit(nix::sys::resource::Resource::RLIMIT_NOFILE, fd_limit, fd_limit).unwrap();
+        nix::sys::resource::setrlimit(
+            nix::sys::resource::Resource::RLIMIT_NOFILE,
+            fd_limit,
+            fd_limit,
+        )
+        .unwrap();
 
         let mut ret = Self {
             by_pid: BTreeMap::new(),
