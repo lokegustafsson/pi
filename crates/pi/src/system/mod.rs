@@ -23,7 +23,7 @@ pub enum SystemNavigation {
 impl Component for SystemTab {
     type Navigation = SystemNavigation;
     type Info = SysInfo;
-    fn render(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
+    fn render(ui: &mut Ui, nav: &mut SystemNavigation, info: &mut SysInfo) {
         ui.heading("System view");
         egui::SidePanel::left("system-left-panel").show_inside(ui, |ui| {
             side_panel_items(ui, nav, info);

@@ -7,7 +7,8 @@ pub struct ProcIngest {
 }
 pub struct ProcessIngest {
     pub kernel: bool,
-    pub cmdline: String,
+    pub name: String,
+    pub cmdline: Option<String>,
     pub by_tid: BTreeMap<u32, ThreadIngest>,
 
     pub status: procfs::PidStatus,
@@ -72,9 +73,10 @@ impl ProcIngest {
 impl ProcessIngest {
     fn new_from_old(pid: u32, old: Option<Self>) -> Option<Self> {
         let mut old = old.or_else(|| {
-            let (kernel, cmdline) = procfs::get_is_kernel_and_cmdline(pid)?;
+            let (kernel, name, cmdline) = procfs::get_is_kernel_name_cmdline(pid)?;
             Some(Self {
                 kernel,
+                name,
                 cmdline,
                 by_tid: BTreeMap::new(),
                 status: procfs::PidStatus::new(pid, kernel),
@@ -86,6 +88,7 @@ impl ProcessIngest {
         let (uid, gid, vm_rss_kb, threads) = old.status.get_uid_gid_vm_rss_kb_threads()?;
         Some(ProcessIngest {
             kernel: old.kernel,
+            name: old.name,
             cmdline: old.cmdline,
             by_tid: ThreadIngest::new_by_tid(pid, old.by_tid, threads == 1)?,
             status: old.status,

@@ -63,10 +63,10 @@ impl Ingester {
             self.proc_info.update(&self.proc_ingest);
         }
     }
-    pub fn process_info(&self) -> &ProcInfo {
-        &self.proc_info
+    pub fn process_info(&mut self) -> &mut ProcInfo {
+        &mut self.proc_info
     }
-    pub fn system_info(&self) -> &SysInfo {
-        &self.sys_info
+    pub fn system_info(&mut self) -> &mut SysInfo {
+        &mut self.sys_info
     }
 }

@@ -3,11 +3,13 @@ use std::{
     collections::HashMap,
     fs,
     ops::{Add, AddAssign},
+    rc::Rc,
 };
 
 #[derive(Debug)]
 pub struct ProcInfo {
     update_hz: u8,
+    sort_by: ProcSortBy,
     pub uid_to_user: HashMap<u16, UserInfo>,
     pub gid_to_group: HashMap<u16, GroupInfo>,
     pub login_sessions: Vec<LoginSessionInfo>,
@@ -15,12 +17,21 @@ pub struct ProcInfo {
     pub processes: Vec<ProcessInfo>,
     pub threads: Vec<ThreadInfo>,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcSortBy {
+    Id,
+    Name,
+    Cpu,
+    DiskRead,
+    DiskWrite,
+    Memory,
+}
 #[derive(Debug)]
 pub struct LoginSessionInfo {
     pub lsid: Lsid,
     pub stat: ProcStat,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Lsid {
     Kernel,
     SystemdServices,
@@ -30,6 +41,8 @@ pub enum Lsid {
 pub struct SessionInfo {
     pub parent_lsid: Lsid,
     pub sid: u32,
+    pub name: Rc<str>,
+    pub entries_cmdline: Vec<Rc<str>>,
     pub stat: ProcStat,
 }
 #[derive(Debug)]
@@ -38,13 +51,15 @@ pub struct ProcessInfo {
     pub pid: u32,
     pub uid: u16,
     pub gid: u16,
-    pub cmdline: String,
+    pub name: Rc<str>,
+    pub cmdline: Option<Rc<str>>,
     pub stat: ProcStat,
 }
 #[derive(Debug)]
 pub struct ThreadInfo {
     pub parent_pid: u32,
     pub tid: u32,
+    pub name: Rc<str>,
     pub stat: ProcStat,
 }
 #[derive(Clone, Copy, Debug)]
@@ -77,6 +92,7 @@ impl ProcInfo {
             .collect();
         Self {
             update_hz: 1,
+            sort_by: ProcSortBy::Id,
             uid_to_user,
             gid_to_group,
 
@@ -93,10 +109,12 @@ impl ProcInfo {
         self.threads = Vec::new();
         for (&pid, process) in &src.by_pid {
             let thread_start_idx = self.threads.len();
+            let name = Rc::from(process.name.clone());
             for (&tid, thread) in &process.by_tid {
                 self.threads.push(ThreadInfo {
                     parent_pid: pid,
                     tid,
+                    name: Rc::clone(&name),
                     stat: ProcStat {
                         guest_time_millis: thread.guest_time_ms,
                         user_time_millis: thread.user_time_ms,
@@ -112,7 +130,8 @@ impl ProcInfo {
                 pid,
                 uid: process.uid,
                 gid: process.gid,
-                cmdline: process.cmdline.clone(),
+                name,
+                cmdline: process.cmdline.as_ref().map(|s| Rc::from(s.clone())),
                 stat: {
                     let mut stat = self.threads[thread_start_idx..]
                         .iter()
@@ -123,6 +142,7 @@ impl ProcInfo {
                 },
             });
         }
+        self.processes.sort_by_key(|p| (p.parent_sid, p.pid));
         for p in &self.processes {
             if self
                 .sessions
@@ -136,10 +156,15 @@ impl ProcInfo {
                         Lsid::SystemdServices
                     },
                     sid: p.parent_sid,
+                    name: Rc::clone(&p.name),
+                    entries_cmdline: Vec::new(),
                     stat: ProcStat::ZERO,
                 });
             }
-            self.sessions.last_mut().unwrap().stat += p.stat;
+            let sess = self.sessions.last_mut().unwrap();
+            sess.entries_cmdline
+                .push(Rc::clone(p.cmdline.as_ref().unwrap_or(&p.name)));
+            sess.stat += p.stat;
         }
         self.login_sessions = vec![
             LoginSessionInfo {
@@ -158,6 +183,89 @@ impl ProcInfo {
                 Lsid::SystemdSession(_) => unreachable!(),
             };
             self.login_sessions[idx].stat += s.stat;
+        }
+        self.sort_self();
+    }
+    pub fn sort(&mut self, sort_by: ProcSortBy) {
+        if self.sort_by == sort_by {
+            return;
+        }
+        self.sort_by = sort_by;
+        self.sort_self();
+    }
+    fn sort_self(&mut self) {
+        match self.sort_by {
+            ProcSortBy::Id => {
+                self.login_sessions.sort_by_key(|ls| ls.lsid);
+                self.sessions.sort_by_key(|s| s.sid);
+                self.processes.sort_by_key(|p| p.pid);
+                self.threads.sort_by_key(|t| t.tid);
+            }
+            ProcSortBy::Name => {
+                self.login_sessions.sort_by_key(|ls| ls.lsid);
+                self.sessions
+                    .sort_by(|s1, s2| Ord::cmp(&(&s1.name, s1.sid), &(&s2.name, s2.sid)));
+                self.processes
+                    .sort_by(|p1, p2| Ord::cmp(&(&p1.name, p1.pid), &(&p2.name, p2.pid)));
+                self.threads
+                    .sort_by(|t1, t2| Ord::cmp(&(&t1.name, t1.tid), &(&t2.name, t2.tid)));
+            }
+            ProcSortBy::Cpu => {
+                self.login_sessions.sort_by_key(|ls| {
+                    (
+                        u32::MAX - ls.stat.user_time_millis - ls.stat.system_time_millis,
+                        ls.lsid,
+                    )
+                });
+                self.sessions.sort_by_key(|s| {
+                    (
+                        u32::MAX - s.stat.user_time_millis - s.stat.system_time_millis,
+                        s.sid,
+                    )
+                });
+                self.processes.sort_by_key(|p| {
+                    (
+                        u32::MAX - p.stat.user_time_millis - p.stat.system_time_millis,
+                        p.pid,
+                    )
+                });
+                self.threads.sort_by_key(|t| {
+                    (
+                        u32::MAX - t.stat.user_time_millis - t.stat.system_time_millis,
+                        t.tid,
+                    )
+                });
+            }
+            ProcSortBy::DiskRead => {
+                self.login_sessions
+                    .sort_by_key(|ls| (u64::MAX - ls.stat.disk_read_bytes_per_second, ls.lsid));
+                self.sessions
+                    .sort_by_key(|s| (u64::MAX - s.stat.disk_read_bytes_per_second, s.sid));
+                self.processes
+                    .sort_by_key(|p| (u64::MAX - p.stat.disk_read_bytes_per_second, p.pid));
+                self.threads
+                    .sort_by_key(|t| (u64::MAX - t.stat.disk_read_bytes_per_second, t.tid));
+            }
+            ProcSortBy::DiskWrite => {
+                self.login_sessions
+                    .sort_by_key(|ls| (u64::MAX - ls.stat.disk_write_bytes_per_second, ls.lsid));
+                self.sessions
+                    .sort_by_key(|s| (u64::MAX - s.stat.disk_write_bytes_per_second, s.sid));
+                self.processes
+                    .sort_by_key(|p| (u64::MAX - p.stat.disk_write_bytes_per_second, p.pid));
+                self.threads
+                    .sort_by_key(|t| (u64::MAX - t.stat.disk_write_bytes_per_second, t.tid));
+            }
+            ProcSortBy::Memory => {
+                self.login_sessions
+                    .sort_by_key(|ls| (u64::MAX - ls.stat.mem_bytes, ls.lsid));
+                self.sessions
+                    .sort_by_key(|s| (u64::MAX - s.stat.mem_bytes, s.sid));
+                self.processes
+                    .sort_by_key(|p| (u64::MAX - p.stat.mem_bytes, p.pid));
+                self.threads
+                    .sort_by_key(|t| (u64::MAX - t.stat.mem_bytes, t.tid));
+            }
         }
     }
 }

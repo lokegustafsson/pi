@@ -6,20 +6,20 @@ use std::{
 };
 use util::TextualKeyValue;
 
-pub fn get_is_kernel_and_cmdline(pid: u32) -> Option<(bool, String)> {
+pub fn get_is_kernel_name_cmdline(pid: u32) -> Option<(bool, String, Option<String>)> {
     let cmdline = read_to_string(format!("/proc/{pid}/cmdline"))?;
+    let status = read_to_string(format!("/proc/{pid}/status"))?;
+    let name = status
+        .lines()
+        .next()
+        .unwrap()
+        .strip_prefix("Name:\t")
+        .unwrap()
+        .trim();
     if cmdline.is_empty() {
-        let status = read_to_string(format!("/proc/{pid}/status"))?;
-        let name = status
-            .lines()
-            .next()
-            .unwrap()
-            .strip_prefix("Name:\t")
-            .unwrap()
-            .trim();
-        Some((true, format!("[{name}]")))
+        Some((true, format!("[{name}]"), None))
     } else {
-        Some((false, cmdline))
+        Some((false, name.to_owned(), Some(cmdline.replace('\0', " "))))
     }
 }
 

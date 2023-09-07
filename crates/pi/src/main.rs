@@ -114,5 +114,5 @@ impl eframe::App for State {
 pub trait Component {
     type Navigation;
     type Info;
-    fn render(ui: &mut Ui, nav: &mut Self::Navigation, info: &Self::Info);
+    fn render(ui: &mut Ui, nav: &mut Self::Navigation, info: &mut Self::Info);
 }

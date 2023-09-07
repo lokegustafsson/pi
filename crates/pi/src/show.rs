@@ -41,6 +41,15 @@ impl Show {
         }
     }
 
+    pub fn size(size: f64) -> String {
+        let Self {
+            value,
+            num_decimals,
+            scale,
+        } = Self::new(size);
+        let unit = Self::SIZES[scale as usize];
+        format!("{value:>4.*}{unit}", num_decimals as usize,)
+    }
     pub fn size_at_scale(used: f64, reference: f64) -> String {
         let scale = Self::scale_of(reference);
         let Self {
