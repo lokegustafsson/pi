@@ -21,7 +21,7 @@ impl Component for ProcessTab {
             ui.selectable_value(nav, ProcessNavigation::Threads, "Threads");
         });
 
-        let mut sort_by = None;
+        let mut sort_by = info.get_sort_by();
         match nav {
             ProcessNavigation::LoginSessions => {
                 table(
@@ -87,9 +87,7 @@ impl Component for ProcessTab {
                 );
             }
         }
-        if let Some(sort_by) = sort_by {
-            info.sort(sort_by);
-        }
+        info.sort(sort_by);
     }
 }
 fn table<T>(
@@ -97,7 +95,7 @@ fn table<T>(
     rows: &[T],
     header: &[&str],
     mut f: impl FnMut(&mut Ui, &T),
-    sort_by: &mut Option<ProcSortBy>,
+    sort_by: &mut ProcSortBy,
 ) {
     egui::Frame::none().outer_margin(20.0).show(ui, |ui| {
         let row_height = ui.text_style_height(&TextStyle::Body);
@@ -113,18 +111,22 @@ fn table<T>(
                     .spacing(spacing)
                     .show(ui, |ui| {
                         for (i, title) in header.iter().enumerate() {
-                            if ui.button(*title).clicked() {
-                                *sort_by = Some(match i {
-                                    0 => ProcSortBy::Id,
-                                    _ if i == header.len() - 5 || i == header.len() - 4 => {
-                                        ProcSortBy::Cpu
-                                    }
-                                    _ if i == header.len() - 3 => ProcSortBy::DiskRead,
-                                    _ if i == header.len() - 2 => ProcSortBy::DiskWrite,
-                                    _ if i == header.len() - 1 => ProcSortBy::Memory,
-                                    _ => ProcSortBy::Name,
-                                })
-                            }
+                            if ui
+                                .selectable_value(
+                                    sort_by,
+                                    match i {
+                                        0 => ProcSortBy::Id,
+                                        1 => ProcSortBy::Name,
+                                        2 | 3 => ProcSortBy::Cpu,
+                                        4 => ProcSortBy::DiskRead,
+                                        5 => ProcSortBy::DiskWrite,
+                                        6 => ProcSortBy::Memory,
+                                        _ => unreachable!(),
+                                    },
+                                    *title,
+                                )
+                                .clicked()
+                            {}
                         }
                     });
             });

@@ -1,7 +1,6 @@
 use crate::SysHandles;
 use std::{
-    collections::BTreeMap, convert::Infallible, fs::File, path::Path, str::FromStr,
-    time::Duration,
+    collections::BTreeMap, convert::Infallible, fs::File, path::Path, str::FromStr, time::Duration,
 };
 
 #[derive(Clone, Debug)]

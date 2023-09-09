@@ -192,6 +192,9 @@ impl ProcInfo {
         }
         self.sort_self();
     }
+    pub fn get_sort_by(&self) -> ProcSortBy {
+        self.sort_by
+    }
     pub fn sort(&mut self, sort_by: ProcSortBy) {
         if self.sort_by == sort_by {
             return;
