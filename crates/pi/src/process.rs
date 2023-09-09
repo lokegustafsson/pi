@@ -42,13 +42,13 @@ impl Component for ProcessTab {
                     &slice_concat(&["sid", "name"], STAT_HEADER),
                     |ui, row| {
                         ui.label(format!("{:?}", row.sid));
-                        let resp_name = ui.monospace(&*row.name);
-                        ui.interact(resp_name.rect, Id::new("cmdline"), Sense::hover())
-                            .on_hover_ui_at_pointer(|ui| {
-                                for entry in &row.entries_cmdline {
-                                    ui.monospace(&**entry);
-                                }
-                            });
+                        let resp_name = ui.monospace(info.strings.get(row.name));
+                        if !row.entries_cmdline.is_empty() {
+                            ui.interact(resp_name.rect, Id::new("cmdline"), Sense::hover())
+                                .on_hover_ui_at_pointer(|ui| {
+                                    ui.monospace(&row.entries_cmdline);
+                                });
+                        }
                         stat_labels(ui, &row.stat);
                     },
                     &mut sort_by,
@@ -61,7 +61,7 @@ impl Component for ProcessTab {
                     &slice_concat(&["pid", "name"], STAT_HEADER),
                     |ui, row| {
                         ui.label(format!("{:?}", row.pid));
-                        let resp_cmdline = ui.monospace(&*row.name);
+                        let resp_cmdline = ui.monospace(info.strings.get(row.name));
                         if let Some(cmdline) = &row.cmdline {
                             ui.interact(resp_cmdline.rect, Id::new("cmdline"), Sense::hover())
                                 .on_hover_ui_at_pointer(|ui| {
@@ -80,7 +80,7 @@ impl Component for ProcessTab {
                     &slice_concat(&["tid", "name"], STAT_HEADER),
                     |ui, row| {
                         ui.label(format!("{:?}", row.tid));
-                        ui.monospace(&*row.name);
+                        ui.monospace(info.strings.get(row.name));
                         stat_labels(ui, &row.stat);
                     },
                     &mut sort_by,

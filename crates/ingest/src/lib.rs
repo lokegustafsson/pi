@@ -1,72 +1,96 @@
 use procinfo::{ProcInfo, ProcIngest};
-use std::time::{Duration, Instant};
+use std::{
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Mutex,
+    },
+    thread,
+};
 use sysinfo::{SysHandles, SysInfo, SysOldSnapshot, SysSnapshot};
 use util::{SUBSEC, TICK_DELAY};
 
-pub struct Ingester {
-    next_update_instant: Instant,
+struct MetricsProducer {
     scratch_buf: String,
-
     sys_handles: SysHandles,
     sys_old_snapshot: SysOldSnapshot,
-    sys_info: SysInfo,
 
-    proc_subsec_counter: u64,
     proc_ingest: ProcIngest,
-    proc_info: ProcInfo,
+
+    consumer: MetricsConsumer,
 }
-impl Ingester {
-    pub fn new() -> Self {
+pub struct MetricsConsumer {
+    pub sys_info: &'static Mutex<SysInfo>,
+    pub proc_info: &'static Mutex<ProcInfo>,
+    viewing: &'static AtomicU8,
+}
+impl MetricsConsumer {
+    const VIEWING_PROC: u8 = 0;
+    const VIEWING_SYS: u8 = 1;
+    pub fn start(ctx: egui::Context) -> Self {
+        let consumer = Self {
+            sys_info: Box::leak(Box::new(Mutex::new(SysInfo::default()))),
+            proc_info: Box::leak(Box::new(Mutex::new(ProcInfo::new()))),
+            viewing: Box::leak(Box::new(AtomicU8::new(Self::VIEWING_SYS))),
+        };
         let mut scratch_buf = String::new();
-
         let mut sys_handles = SysHandles::new();
-        let sys_old_snapshot = SysSnapshot::new(&mut scratch_buf, &mut sys_handles).retire();
-
-        let proc_ingest = ProcIngest::new();
-
-        Self {
-            next_update_instant: Instant::now(),
+        let producer = MetricsProducer {
+            proc_ingest: ProcIngest::new(),
+            sys_old_snapshot: SysSnapshot::new(&mut scratch_buf, &mut sys_handles).retire(),
             scratch_buf,
             sys_handles,
-            sys_old_snapshot,
-            sys_info: SysInfo::default(),
-            proc_subsec_counter: SUBSEC,
-            proc_ingest,
-            proc_info: ProcInfo::new(),
+            consumer: Self {
+                sys_info: consumer.sys_info,
+                proc_info: consumer.proc_info,
+                viewing: consumer.viewing,
+            },
+        };
+        thread::spawn(move || producer.run(ctx));
+        consumer
+    }
+    pub fn set_viewing_proc(&self) {
+        self.viewing.store(Self::VIEWING_PROC, Ordering::Relaxed);
+    }
+    pub fn set_viewing_sys(&self) {
+        self.viewing.store(Self::VIEWING_SYS, Ordering::Relaxed);
+    }
+}
+impl MetricsProducer {
+    fn run(mut self, ctx: egui::Context) {
+        let mut proc_counter = 0;
+        loop {
+            thread::sleep(TICK_DELAY);
+            self.update_sys();
+            if proc_counter == 0 {
+                proc_counter = SUBSEC;
+                self.update_proc();
+                ctx.request_repaint();
+            } else {
+                match self.consumer.viewing.load(Ordering::Relaxed) {
+                    MetricsConsumer::VIEWING_PROC => {}
+                    MetricsConsumer::VIEWING_SYS => ctx.request_repaint(),
+                    _ => unreachable!(),
+                }
+            }
+            proc_counter -= 1;
         }
     }
-    pub fn poll_update(&mut self) {
-        if Instant::now() >= self.next_update_instant {
-            self.next_update_instant += TICK_DELAY;
-            self.tick_update();
-        }
-    }
-    pub fn safe_sleep_duration(&self) -> Duration {
-        self.next_update_instant
-            .saturating_duration_since(Instant::now())
-    }
-    fn tick_update(&mut self) {
-        // Possibly refresh handles (added/removed interfaces/disk/etc)
+    fn update_sys(&mut self) {
         self.sys_handles.update();
-
-        // All data for a given tick is read as a `Snapshot`.
         let new = SysSnapshot::new(&mut self.scratch_buf, &mut self.sys_handles);
-
-        // We then update our persistent state using the `Snapshot`.
-        self.sys_info.update(&new, &self.sys_old_snapshot);
+        self.consumer
+            .sys_info
+            .lock()
+            .unwrap()
+            .update(&new, &self.sys_old_snapshot);
         self.sys_old_snapshot = new.retire();
-
-        self.proc_subsec_counter -= 1;
-        if self.proc_subsec_counter == 0 {
-            self.proc_subsec_counter = SUBSEC;
-            self.proc_ingest.update();
-            self.proc_info.update(&self.proc_ingest);
-        }
     }
-    pub fn process_info(&mut self) -> &mut ProcInfo {
-        &mut self.proc_info
-    }
-    pub fn system_info(&mut self) -> &mut SysInfo {
-        &mut self.sys_info
+    fn update_proc(&mut self) {
+        self.proc_ingest.update();
+        self.consumer
+            .proc_info
+            .lock()
+            .unwrap()
+            .update(&self.proc_ingest);
     }
 }

@@ -708,6 +708,7 @@ in
     src = fetchCratesIo { inherit name version; sha256 = "a3aef8ec3ae1b772f340170c65bf27d5b8c28f543a0116c844d2ac08d01123e7"; };
     features = builtins.concatLists [
       [ "bytemuck" ]
+      [ "default" ]
       [ "default_fonts" ]
       [ "log" ]
     ];
@@ -1106,6 +1107,7 @@ in
     registry = "unknown";
     src = fetchCrateLocal (workspaceSrc + "/crates/ingest");
     dependencies = {
+      egui = rustPackages."registry+https://github.com/rust-lang/crates.io-index".egui."0.22.0" { inherit profileName; };
       procinfo = rustPackages."unknown".procinfo."0.1.0" { inherit profileName; };
       sysinfo = rustPackages."unknown".sysinfo."0.1.0" { inherit profileName; };
       util = rustPackages."unknown".util."0.1.0" { inherit profileName; };

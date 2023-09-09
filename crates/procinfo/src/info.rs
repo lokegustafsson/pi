@@ -3,7 +3,6 @@ use std::{
     collections::HashMap,
     fs,
     ops::{Add, AddAssign},
-    rc::Rc,
 };
 
 #[derive(Debug)]
@@ -12,6 +11,7 @@ pub struct ProcInfo {
     sort_by: ProcSortBy,
     pub uid_to_user: HashMap<u16, UserInfo>,
     pub gid_to_group: HashMap<u16, GroupInfo>,
+    pub strings: StringArena,
     pub login_sessions: Vec<LoginSessionInfo>,
     pub sessions: Vec<SessionInfo>,
     pub processes: Vec<ProcessInfo>,
@@ -41,8 +41,8 @@ pub enum Lsid {
 pub struct SessionInfo {
     pub parent_lsid: Lsid,
     pub sid: u32,
-    pub name: Rc<str>,
-    pub entries_cmdline: Vec<Rc<str>>,
+    pub name: StringArenaHandle,
+    pub entries_cmdline: String,
     pub stat: ProcStat,
 }
 #[derive(Debug)]
@@ -51,15 +51,15 @@ pub struct ProcessInfo {
     pub pid: u32,
     pub uid: u16,
     pub gid: u16,
-    pub name: Rc<str>,
-    pub cmdline: Option<Rc<str>>,
+    pub name: StringArenaHandle,
+    pub cmdline: Option<String>,
     pub stat: ProcStat,
 }
 #[derive(Debug)]
 pub struct ThreadInfo {
     pub parent_pid: u32,
     pub tid: u32,
-    pub name: Rc<str>,
+    pub name: StringArenaHandle,
     pub stat: ProcStat,
 }
 #[derive(Clone, Copy, Debug)]
@@ -95,6 +95,7 @@ impl ProcInfo {
             sort_by: ProcSortBy::Id,
             uid_to_user,
             gid_to_group,
+            strings: StringArena::default(),
 
             login_sessions: Vec::new(),
             sessions: Vec::new(),
@@ -103,18 +104,19 @@ impl ProcInfo {
         }
     }
     pub fn update(&mut self, src: &ProcIngest) {
+        self.strings = StringArena::default();
         self.login_sessions = Vec::new();
         self.sessions = Vec::new();
         self.processes = Vec::new();
         self.threads = Vec::new();
         for (&pid, process) in &src.by_pid {
             let thread_start_idx = self.threads.len();
-            let name = Rc::from(process.name.clone());
+            let name = self.strings.push(process.name.clone());
             for (&tid, thread) in &process.by_tid {
                 self.threads.push(ThreadInfo {
                     parent_pid: pid,
                     tid,
-                    name: Rc::clone(&name),
+                    name,
                     stat: ProcStat {
                         guest_time_millis: thread.guest_time_ms,
                         user_time_millis: thread.user_time_ms,
@@ -131,7 +133,7 @@ impl ProcInfo {
                 uid: process.uid,
                 gid: process.gid,
                 name,
-                cmdline: process.cmdline.as_ref().map(|s| Rc::from(s.clone())),
+                cmdline: process.cmdline.clone(),
                 stat: {
                     let mut stat = self.threads[thread_start_idx..]
                         .iter()
@@ -156,14 +158,18 @@ impl ProcInfo {
                         Lsid::SystemdServices
                     },
                     sid: p.parent_sid,
-                    name: Rc::clone(&p.name),
-                    entries_cmdline: Vec::new(),
+                    name: p.name,
+                    entries_cmdline: String::new(),
                     stat: ProcStat::ZERO,
                 });
             }
             let sess = self.sessions.last_mut().unwrap();
-            sess.entries_cmdline
-                .push(Rc::clone(p.cmdline.as_ref().unwrap_or(&p.name)));
+            if let Some(cmdline) = p.cmdline.as_ref() {
+                if !sess.entries_cmdline.is_empty() {
+                    sess.entries_cmdline.push_str("\n");
+                }
+                sess.entries_cmdline.push_str(cmdline);
+            }
             sess.stat += p.stat;
         }
         self.login_sessions = vec![
@@ -203,12 +209,24 @@ impl ProcInfo {
             }
             ProcSortBy::Name => {
                 self.login_sessions.sort_by_key(|ls| ls.lsid);
-                self.sessions
-                    .sort_by(|s1, s2| Ord::cmp(&(&s1.name, s1.sid), &(&s2.name, s2.sid)));
-                self.processes
-                    .sort_by(|p1, p2| Ord::cmp(&(&p1.name, p1.pid), &(&p2.name, p2.pid)));
-                self.threads
-                    .sort_by(|t1, t2| Ord::cmp(&(&t1.name, t1.tid), &(&t2.name, t2.tid)));
+                self.sessions.sort_by(|s1, s2| {
+                    Ord::cmp(
+                        &(&self.strings.get(s1.name), s1.sid),
+                        &(&self.strings.get(s2.name), s2.sid),
+                    )
+                });
+                self.processes.sort_by(|p1, p2| {
+                    Ord::cmp(
+                        &(&self.strings.get(p1.name), p1.pid),
+                        &(&self.strings.get(p2.name), p2.pid),
+                    )
+                });
+                self.threads.sort_by(|t1, t2| {
+                    Ord::cmp(
+                        &(&self.strings.get(t1.name), t1.tid),
+                        &(&self.strings.get(t2.name), t2.tid),
+                    )
+                });
             }
             ProcSortBy::Cpu => {
                 self.login_sessions.sort_by_key(|ls| {
@@ -359,5 +377,25 @@ impl GroupInfo {
             .map(str::to_owned)
             .collect();
         Self { name, gid, users }
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct StringArena {
+    arena: Vec<String>,
+}
+#[derive(Debug, Clone, Copy)]
+pub struct StringArenaHandle {
+    idx: usize,
+}
+impl StringArena {
+    fn push(&mut self, s: String) -> StringArenaHandle {
+        self.arena.push(s);
+        StringArenaHandle {
+            idx: self.arena.len() - 1,
+        }
+    }
+    pub fn get(&self, h: StringArenaHandle) -> &str {
+        &self.arena[h.idx]
     }
 }

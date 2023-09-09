@@ -777,6 +777,7 @@ dependencies = [
 name = "ingest"
 version = "0.1.0"
 dependencies = [
+ "egui",
  "procinfo",
  "sysinfo",
  "util",

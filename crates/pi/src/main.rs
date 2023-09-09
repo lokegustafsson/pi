@@ -7,7 +7,7 @@ use crate::{
 };
 use clap::{Parser, Subcommand};
 use eframe::egui::{self, Ui};
-use ingest::Ingester;
+use ingest::MetricsConsumer;
 use tracing_subscriber::Layer;
 
 mod process;
@@ -52,7 +52,7 @@ fn main() -> Result<(), eframe::Error> {
             default_theme: eframe::Theme::Light,
             ..Default::default()
         },
-        Box::new(move |_| {
+        Box::new(move |cc| {
             Box::new(State {
                 nav: Navigation {
                     tab: if cli.focus.is_some() {
@@ -69,7 +69,7 @@ fn main() -> Result<(), eframe::Error> {
                         Some(Focus::Gpu) => SystemNavigation::Gpu,
                     },
                 },
-                ingester: Ingester::new(),
+                metrics: MetricsConsumer::start(cc.egui_ctx.clone()),
             })
         }),
     )
@@ -77,7 +77,7 @@ fn main() -> Result<(), eframe::Error> {
 
 struct State {
     nav: Navigation,
-    ingester: Ingester,
+    metrics: MetricsConsumer,
 }
 struct Navigation {
     tab: NavigationTab,
@@ -91,23 +91,28 @@ enum NavigationTab {
 }
 impl eframe::App for State {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
-        self.ingester.poll_update();
-
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.nav.tab, NavigationTab::Process, "Processes");
                 ui.selectable_value(&mut self.nav.tab, NavigationTab::System, "System");
             });
             match self.nav.tab {
-                NavigationTab::Process => {
-                    ProcessTab::render(ui, &mut self.nav.process, self.ingester.process_info())
-                }
-                NavigationTab::System => {
-                    SystemTab::render(ui, &mut self.nav.system, self.ingester.system_info())
-                }
+                NavigationTab::Process => ProcessTab::render(
+                    ui,
+                    &mut self.nav.process,
+                    &mut self.metrics.proc_info.lock().unwrap(),
+                ),
+                NavigationTab::System => SystemTab::render(
+                    ui,
+                    &mut self.nav.system,
+                    &mut self.metrics.sys_info.lock().unwrap(),
+                ),
             }
         });
-        ctx.request_repaint_after(self.ingester.safe_sleep_duration())
+        match self.nav.tab {
+            NavigationTab::Process => self.metrics.set_viewing_proc(),
+            NavigationTab::System => self.metrics.set_viewing_sys(),
+        }
     }
 }
 
