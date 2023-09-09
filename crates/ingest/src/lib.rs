@@ -10,7 +10,6 @@ use sysinfo::{SysHandles, SysInfo, SysOldSnapshot, SysSnapshot};
 use util::{SUBSEC, TICK_DELAY};
 
 struct MetricsProducer {
-    scratch_buf: String,
     sys_handles: SysHandles,
     sys_old_snapshot: SysOldSnapshot,
 
@@ -32,12 +31,10 @@ impl MetricsConsumer {
             proc_info: Box::leak(Box::new(Mutex::new(ProcInfo::new()))),
             viewing: Box::leak(Box::new(AtomicU8::new(Self::VIEWING_SYS))),
         };
-        let mut scratch_buf = String::new();
         let mut sys_handles = SysHandles::new();
         let producer = MetricsProducer {
             proc_ingest: ProcIngest::new(),
-            sys_old_snapshot: SysSnapshot::new(&mut scratch_buf, &mut sys_handles).retire(),
-            scratch_buf,
+            sys_old_snapshot: SysSnapshot::new(&mut sys_handles).retire(),
             sys_handles,
             consumer: Self {
                 sys_info: consumer.sys_info,
@@ -60,6 +57,7 @@ impl MetricsProducer {
         let mut proc_counter = 0;
         loop {
             thread::sleep(TICK_DELAY);
+
             self.update_sys();
             if proc_counter == 0 {
                 proc_counter = SUBSEC;
@@ -77,7 +75,7 @@ impl MetricsProducer {
     }
     fn update_sys(&mut self) {
         self.sys_handles.update();
-        let new = SysSnapshot::new(&mut self.scratch_buf, &mut self.sys_handles);
+        let new = SysSnapshot::new(&mut self.sys_handles);
         self.consumer
             .sys_info
             .lock()

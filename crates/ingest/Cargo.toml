@@ -9,4 +9,5 @@ edition = "2021"
 egui = "0.22"
 procinfo = { path = "../procinfo" }
 sysinfo = { path = "../sysinfo" }
+tracing = "0.1"
 util = { path = "../util" }

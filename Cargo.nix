@@ -1110,6 +1110,7 @@ in
       egui = rustPackages."registry+https://github.com/rust-lang/crates.io-index".egui."0.22.0" { inherit profileName; };
       procinfo = rustPackages."unknown".procinfo."0.1.0" { inherit profileName; };
       sysinfo = rustPackages."unknown".sysinfo."0.1.0" { inherit profileName; };
+      tracing = rustPackages."registry+https://github.com/rust-lang/crates.io-index".tracing."0.1.37" { inherit profileName; };
       util = rustPackages."unknown".util."0.1.0" { inherit profileName; };
     };
   });
@@ -1300,19 +1301,6 @@ in
     };
   });
   
-  "registry+https://github.com/rust-lang/crates.io-index".memoffset."0.7.1" = overridableMkRustCrate (profileName: rec {
-    name = "memoffset";
-    version = "0.7.1";
-    registry = "registry+https://github.com/rust-lang/crates.io-index";
-    src = fetchCratesIo { inherit name version; sha256 = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"; };
-    features = builtins.concatLists [
-      [ "default" ]
-    ];
-    buildDependencies = {
-      autocfg = buildRustPackages."registry+https://github.com/rust-lang/crates.io-index".autocfg."1.1.0" { profileName = "__noProfile"; };
-    };
-  });
-  
   "registry+https://github.com/rust-lang/crates.io-index".minimal-lexical."0.2.1" = overridableMkRustCrate (profileName: rec {
     name = "minimal-lexical";
     version = "0.2.1";
@@ -1465,58 +1453,6 @@ in
     };
   });
   
-  "registry+https://github.com/rust-lang/crates.io-index".nix."0.26.2" = overridableMkRustCrate (profileName: rec {
-    name = "nix";
-    version = "0.26.2";
-    registry = "registry+https://github.com/rust-lang/crates.io-index";
-    src = fetchCratesIo { inherit name version; sha256 = "bfdda3d196821d6af13126e40375cdf7da646a96114af134d5f417a9a1dc8e1a"; };
-    features = builtins.concatLists [
-      [ "acct" ]
-      [ "aio" ]
-      [ "default" ]
-      [ "dir" ]
-      [ "env" ]
-      [ "event" ]
-      [ "feature" ]
-      [ "fs" ]
-      [ "hostname" ]
-      [ "inotify" ]
-      [ "ioctl" ]
-      [ "kmod" ]
-      [ "memoffset" ]
-      [ "mman" ]
-      [ "mount" ]
-      [ "mqueue" ]
-      [ "net" ]
-      [ "personality" ]
-      [ "pin-utils" ]
-      [ "poll" ]
-      [ "process" ]
-      [ "pthread" ]
-      [ "ptrace" ]
-      [ "quota" ]
-      [ "reboot" ]
-      [ "resource" ]
-      [ "sched" ]
-      [ "signal" ]
-      [ "socket" ]
-      [ "term" ]
-      [ "time" ]
-      [ "ucontext" ]
-      [ "uio" ]
-      [ "user" ]
-      [ "zerocopy" ]
-    ];
-    dependencies = {
-      bitflags = rustPackages."registry+https://github.com/rust-lang/crates.io-index".bitflags."1.3.2" { inherit profileName; };
-      cfg_if = rustPackages."registry+https://github.com/rust-lang/crates.io-index".cfg-if."1.0.0" { inherit profileName; };
-      libc = rustPackages."registry+https://github.com/rust-lang/crates.io-index".libc."0.2.147" { inherit profileName; };
-      ${ if !(hostPlatform.parsed.kernel.name == "redox") then "memoffset" else null } = rustPackages."registry+https://github.com/rust-lang/crates.io-index".memoffset."0.7.1" { inherit profileName; };
-      pin_utils = rustPackages."registry+https://github.com/rust-lang/crates.io-index".pin-utils."0.1.0" { inherit profileName; };
-      static_assertions = rustPackages."registry+https://github.com/rust-lang/crates.io-index".static_assertions."1.1.0" { inherit profileName; };
-    };
-  });
-  
   "registry+https://github.com/rust-lang/crates.io-index".nix."0.27.1" = overridableMkRustCrate (profileName: rec {
     name = "nix";
     version = "0.27.1";
@@ -1524,6 +1460,7 @@ in
     src = fetchCratesIo { inherit name version; sha256 = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"; };
     features = builtins.concatLists [
       [ "default" ]
+      [ "fs" ]
       [ "resource" ]
       [ "uio" ]
     ];
@@ -1870,13 +1807,6 @@ in
     src = fetchCratesIo { inherit name version; sha256 = "8afb450f006bf6385ca15ef45d71d2288452bc3683ce2e2cacc0d18e4be60b58"; };
   });
   
-  "registry+https://github.com/rust-lang/crates.io-index".pin-utils."0.1.0" = overridableMkRustCrate (profileName: rec {
-    name = "pin-utils";
-    version = "0.1.0";
-    registry = "registry+https://github.com/rust-lang/crates.io-index";
-    src = fetchCratesIo { inherit name version; sha256 = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"; };
-  });
-  
   "registry+https://github.com/rust-lang/crates.io-index".pkg-config."0.3.27" = overridableMkRustCrate (profileName: rec {
     name = "pkg-config";
     version = "0.3.27";
@@ -2093,13 +2023,6 @@ in
     };
   });
   
-  "registry+https://github.com/rust-lang/crates.io-index".static_assertions."1.1.0" = overridableMkRustCrate (profileName: rec {
-    name = "static_assertions";
-    version = "1.1.0";
-    registry = "registry+https://github.com/rust-lang/crates.io-index";
-    src = fetchCratesIo { inherit name version; sha256 = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"; };
-  });
-  
   "registry+https://github.com/rust-lang/crates.io-index".str-buf."1.0.6" = overridableMkRustCrate (profileName: rec {
     name = "str-buf";
     version = "1.0.6";
@@ -2173,7 +2096,7 @@ in
     registry = "unknown";
     src = fetchCrateLocal (workspaceSrc + "/crates/sysinfo");
     dependencies = {
-      nix = rustPackages."registry+https://github.com/rust-lang/crates.io-index".nix."0.26.2" { inherit profileName; };
+      nix = rustPackages."registry+https://github.com/rust-lang/crates.io-index".nix."0.27.1" { inherit profileName; };
       tracing = rustPackages."registry+https://github.com/rust-lang/crates.io-index".tracing."0.1.37" { inherit profileName; };
       util = rustPackages."unknown".util."0.1.0" { inherit profileName; };
     };

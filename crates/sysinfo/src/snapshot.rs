@@ -1,11 +1,6 @@
 use crate::SysHandles;
 use std::{
-    collections::BTreeMap,
-    convert::Infallible,
-    fs::File,
-    io::{Read, Seek},
-    path::Path,
-    str::FromStr,
+    collections::BTreeMap, convert::Infallible, fs::File, path::Path, str::FromStr,
     time::Duration,
 };
 
@@ -47,46 +42,39 @@ impl SysSnapshot {
             by_net_interface: self.by_net_interface,
         }
     }
-    pub fn new(scratch_buf: &mut String, handles: &mut SysHandles) -> Self {
-        fn parse<F: FromStr>(file: &mut File, scratch_buf: &mut String) -> F
+    pub fn new(handles: &mut SysHandles) -> Self {
+        fn parse<F: FromStr>(file: &mut File) -> F
         where
             F::Err: std::fmt::Debug,
         {
-            file.read_to_string(scratch_buf).unwrap();
-            file.rewind().unwrap();
-            let ret = scratch_buf.trim().parse().unwrap();
-            scratch_buf.clear();
+            let buf = &mut [0u8; 8196];
+            let s = read_file_to_string(file, buf);
+            let ret = s.trim().parse().unwrap();
             ret
         }
 
-        handles.diskstats.read_to_string(scratch_buf).unwrap();
-        let disk_stats = scratch_buf
-            .lines()
-            .map(|line| line.parse().unwrap())
-            .collect();
-        scratch_buf.clear();
-        handles.diskstats.rewind().unwrap();
+        let buf = &mut [0u8; 8196];
+        let data = read_file_to_string(&mut handles.diskstats, buf);
+        let disk_stats = data.lines().map(|line| line.parse().unwrap()).collect();
 
-        handles.stat.read_to_string(scratch_buf).unwrap();
-        let cpus_stat = scratch_buf
+        let data = read_file_to_string(&mut handles.stat, buf);
+        let cpus_stat = data
             .lines()
             .take_while(|line| line.starts_with("cpu"))
             .skip_while(|line| line.starts_with("cpu "))
             .map(|line| line.parse().unwrap())
             .collect();
-        scratch_buf.clear();
-        handles.stat.rewind().unwrap();
 
         SysSnapshot {
             disk_stats,
-            mem_info: parse(&mut handles.meminfo, scratch_buf),
-            partition_to_mountpath: parse(&mut handles.mounts, scratch_buf),
+            mem_info: parse(&mut handles.meminfo),
+            partition_to_mountpath: parse(&mut handles.mounts),
             cpus_stat,
-            uptime: parse(&mut handles.uptime, scratch_buf),
+            uptime: parse(&mut handles.uptime),
             cpu_max_temp_millicelsius: {
                 let mut ret = 0;
                 for temp in &mut handles.cpu_temperatures {
-                    ret = ret.max(parse(temp, scratch_buf));
+                    ret = ret.max(parse(temp));
                 }
                 ret
             },
@@ -97,8 +85,8 @@ impl SysSnapshot {
                     (
                         name.to_owned(),
                         NetInterfaceSnapshot {
-                            rx_bytes: parse(&mut interface.rx_bytes, scratch_buf),
-                            tx_bytes: parse(&mut interface.tx_bytes, scratch_buf),
+                            rx_bytes: parse(&mut interface.rx_bytes),
+                            tx_bytes: parse(&mut interface.tx_bytes),
                         },
                     )
                 })
@@ -110,14 +98,14 @@ impl SysSnapshot {
                     (
                         name.to_owned(),
                         GpuSnapshot {
-                            mem_info_vram_used: parse(&mut gpu.mem_info_vram_used, scratch_buf),
-                            mem_info_vram_total: parse(&mut gpu.mem_info_vram_total, scratch_buf),
-                            mem_busy_percent: parse(&mut gpu.mem_busy_percent, scratch_buf),
-                            gpu_busy_percent: parse(&mut gpu.gpu_busy_percent, scratch_buf),
+                            mem_info_vram_used: parse(&mut gpu.mem_info_vram_used),
+                            mem_info_vram_total: parse(&mut gpu.mem_info_vram_total),
+                            mem_busy_percent: parse(&mut gpu.mem_busy_percent),
+                            gpu_busy_percent: parse(&mut gpu.gpu_busy_percent),
                             max_temperature: {
                                 let mut ret = 0;
                                 for temp in &mut gpu.temperatures {
-                                    ret = ret.max(parse(temp, scratch_buf));
+                                    ret = ret.max(parse(temp));
                                 }
                                 ret
                             },
@@ -301,4 +289,11 @@ impl FromStr for Uptime {
             idle_cpu_since_boot: Duration::from_secs_f64(words.next().unwrap().parse().unwrap()),
         })
     }
+}
+
+fn read_file_to_string<'a>(file: &mut File, buf: &'a mut [u8; 8196]) -> &'a str {
+    // For performance reasons, we assume that read returns the entire (tiny, <8K) file.
+    let len = nix::sys::uio::pread(file, buf, 0).unwrap();
+    assert!(len < 8196);
+    std::str::from_utf8(&buf[..len]).unwrap()
 }
