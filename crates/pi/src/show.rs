@@ -42,6 +42,9 @@ impl Show {
     }
 
     pub fn size(size: f64) -> String {
+        if size == 0.0 {
+            return "-".to_owned();
+        }
         let Self {
             value,
             num_decimals,
