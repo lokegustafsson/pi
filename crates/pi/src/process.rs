@@ -1,5 +1,5 @@
 use crate::{show::Show, Component};
-use eframe::egui::{self, style::TextStyle, Id, Sense, Ui};
+use eframe::egui::{self, style::TextStyle, Id, Key, KeyboardShortcut, Modifiers, Sense, Ui};
 use procinfo::{ProcInfo, ProcSortBy, ProcStat};
 
 pub struct ProcessTab;
@@ -14,11 +14,36 @@ impl Component for ProcessTab {
     type Navigation = ProcessNavigation;
     type Info = ProcInfo;
     fn render(ui: &mut Ui, nav: &mut Self::Navigation, info: &mut Self::Info) {
+        ui.ctx().input_mut(|i| {
+            if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::L)) {
+                *nav = ProcessNavigation::LoginSessions;
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::S)) {
+                *nav = ProcessNavigation::Sessions;
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::P)) {
+                *nav = ProcessNavigation::Processes;
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::T)) {
+                *nav = ProcessNavigation::Threads;
+            }
+            if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::I)) {
+                info.sort(ProcSortBy::Id);
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::N)) {
+                info.sort(ProcSortBy::Name);
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::C)) {
+                info.sort(ProcSortBy::Cpu);
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::R)) {
+                info.sort(ProcSortBy::DiskRead);
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::W)) {
+                info.sort(ProcSortBy::DiskWrite);
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::M)) {
+                info.sort(ProcSortBy::Memory);
+            }
+        });
+
         ui.horizontal(|ui| {
-            ui.selectable_value(nav, ProcessNavigation::LoginSessions, "Login sessions");
-            ui.selectable_value(nav, ProcessNavigation::Sessions, "Sessions");
-            ui.selectable_value(nav, ProcessNavigation::Processes, "Processes");
-            ui.selectable_value(nav, ProcessNavigation::Threads, "Threads");
+            ui.selectable_value(nav, ProcessNavigation::LoginSessions, "Login sessions (l)");
+            ui.selectable_value(nav, ProcessNavigation::Sessions, "Sessions (s)");
+            ui.selectable_value(nav, ProcessNavigation::Processes, "Processes (p)");
+            ui.selectable_value(nav, ProcessNavigation::Threads, "Threads (t)");
         });
 
         let mut sort_by = info.get_sort_by();
@@ -27,9 +52,10 @@ impl Component for ProcessTab {
                 table(
                     ui,
                     &info.login_sessions,
-                    &slice_concat(&["lsid"], STAT_HEADER),
+                    "Lsid",
                     |ui, row| {
                         ui.label(format!("{:?}", row.lsid));
+                        ui.monospace(&row.name);
                         stat_labels(ui, &row.stat);
                     },
                     &mut sort_by,
@@ -39,7 +65,7 @@ impl Component for ProcessTab {
                 table(
                     ui,
                     &info.sessions,
-                    &slice_concat(&["sid", "name"], STAT_HEADER),
+                    "Sid",
                     |ui, row| {
                         ui.label(format!("{:?}", row.sid));
                         let resp_name = ui.monospace(info.strings.get(row.name));
@@ -58,7 +84,7 @@ impl Component for ProcessTab {
                 table(
                     ui,
                     &info.processes,
-                    &slice_concat(&["pid", "name"], STAT_HEADER),
+                    "Pid",
                     |ui, row| {
                         ui.label(format!("{:?}", row.pid));
                         let resp_cmdline = ui.monospace(info.strings.get(row.name));
@@ -77,7 +103,7 @@ impl Component for ProcessTab {
                 table(
                     ui,
                     &info.threads,
-                    &slice_concat(&["tid", "name"], STAT_HEADER),
+                    "Tid",
                     |ui, row| {
                         ui.label(format!("{:?}", row.tid));
                         ui.monospace(info.strings.get(row.name));
@@ -93,10 +119,20 @@ impl Component for ProcessTab {
 fn table<T>(
     ui: &mut Ui,
     rows: &[T],
-    header: &[&str],
+    id_header: &str,
     mut f: impl FnMut(&mut Ui, &T),
     sort_by: &mut ProcSortBy,
 ) {
+    let header: [&str; 7] = [
+        &format!("{id_header} (i)"),
+        "Name (n)",
+        "User cpu% (c)",
+        "Sys cpu% (c)",
+        "Disk read (r)",
+        "Disk write (w)",
+        "Mem (m)",
+    ];
+
     egui::Frame::none().outer_margin(20.0).show(ui, |ui| {
         let row_height = ui.text_style_height(&TextStyle::Body);
         let spacing = ui.style().spacing.item_spacing;
@@ -147,7 +183,6 @@ fn table<T>(
         });
     });
 }
-const STAT_HEADER: &[&str] = &["user cpu%", "sys cpu%", "disk read", "disk write", "mem"];
 fn stat_labels(ui: &mut Ui, stat: &ProcStat) {
     ui.label(millis_to_percent(stat.user_time_millis));
     ui.label(millis_to_percent(stat.system_time_millis));
@@ -157,10 +192,4 @@ fn stat_labels(ui: &mut Ui, stat: &ProcStat) {
 }
 fn millis_to_percent(v: u32) -> String {
     format!("{}.{}%", v / 10, v % 10)
-}
-fn slice_concat(a: &[&'static str], b: &[&'static str]) -> Vec<&'static str> {
-    let mut ret = Vec::new();
-    ret.extend_from_slice(a);
-    ret.extend_from_slice(b);
-    ret
 }

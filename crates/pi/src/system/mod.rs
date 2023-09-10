@@ -3,7 +3,10 @@ use crate::{
     system::time_series::{TimeSeries, TimeSeriesKind, ValueKind},
     Component,
 };
-use eframe::egui::{self, Align, Frame, Grid, Id, Label, Layout, Sense, Stroke, Ui, Vec2};
+use eframe::egui::{
+    self, Align, Frame, Grid, Id, Key, KeyboardShortcut, Label, Layout, Modifiers, Sense, Stroke,
+    Ui, Vec2,
+};
 use sysinfo::{Series, SysInfo};
 
 mod time_series;
@@ -24,6 +27,22 @@ impl Component for SystemTab {
     type Navigation = SystemNavigation;
     type Info = SysInfo;
     fn render(ui: &mut Ui, nav: &mut SystemNavigation, info: &mut SysInfo) {
+        ui.ctx().input_mut(|i| {
+            if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::C)) {
+                *nav = SystemNavigation::Cpu;
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::M)) {
+                *nav = SystemNavigation::Ram;
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::D)) {
+                *nav = SystemNavigation::Disk;
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::N)) {
+                *nav = SystemNavigation::Net;
+            } else if !info.by_gpu.is_empty()
+                && i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::G))
+            {
+                *nav = SystemNavigation::Gpu;
+            }
+        });
+
         ui.heading("System view");
         egui::SidePanel::left("system-left-panel").show_inside(ui, |ui| {
             side_panel_items(ui, nav, info);
@@ -61,7 +80,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
         SystemNavigation::Cpu,
         &[("", &info.total_cpu.total)],
         TimeSeries {
-            name: "CPU",
+            name: "CPU (c)",
             max_y: num_cpu as f64,
             kind: TimeSeriesKind::Preview,
             value_kind: ValueKind::Percent,
@@ -78,7 +97,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
         SystemNavigation::Ram,
         &[("", &info.global.mem_used)],
         TimeSeries {
-            name: "RAM",
+            name: "RAM (m)",
             max_y: info.global.mem_total,
             kind: TimeSeriesKind::Preview,
             value_kind: ValueKind::Bytes,
@@ -107,7 +126,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
             ("Write", &info.total_partition.written),
         ],
         TimeSeries {
-            name: "DISK",
+            name: "DISK (d)",
             max_y: f64::INFINITY,
             kind: TimeSeriesKind::Preview,
             value_kind: ValueKind::Bytes,
@@ -127,7 +146,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
             ("Transmit", &info.total_net.tx),
         ],
         TimeSeries {
-            name: "NET",
+            name: "NET (n)",
             max_y: f64::INFINITY,
             kind: TimeSeriesKind::Preview,
             value_kind: ValueKind::Bytes,
@@ -150,7 +169,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
             SystemNavigation::Gpu,
             &[("", &info.total_gpu.gpu_busy)],
             TimeSeries {
-                name: "GPU",
+                name: "GPU (g)",
                 max_y: info.by_gpu.len() as f64,
                 kind: TimeSeriesKind::Preview,
                 value_kind: ValueKind::Percent,

@@ -6,7 +6,7 @@ use crate::{
     system::{SystemNavigation, SystemTab},
 };
 use clap::{Parser, Subcommand};
-use eframe::egui::{self, Ui};
+use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Ui};
 use ingest::MetricsConsumer;
 use tracing_subscriber::Layer;
 
@@ -91,10 +91,17 @@ enum NavigationTab {
 }
 impl eframe::App for State {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        ctx.input_mut(|i| {
+            if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::SHIFT, Key::P)) {
+                self.nav.tab = NavigationTab::Process;
+            } else if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::SHIFT, Key::S)) {
+                self.nav.tab = NavigationTab::System;
+            }
+        });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.nav.tab, NavigationTab::Process, "Processes");
-                ui.selectable_value(&mut self.nav.tab, NavigationTab::System, "System");
+                ui.selectable_value(&mut self.nav.tab, NavigationTab::Process, "Processes (P)");
+                ui.selectable_value(&mut self.nav.tab, NavigationTab::System, "System (S)");
             });
             match self.nav.tab {
                 NavigationTab::Process => ProcessTab::render(

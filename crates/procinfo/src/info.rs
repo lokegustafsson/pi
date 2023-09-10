@@ -29,6 +29,7 @@ pub enum ProcSortBy {
 #[derive(Debug)]
 pub struct LoginSessionInfo {
     pub lsid: Lsid,
+    pub name: String,
     pub stat: ProcStat,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -175,10 +176,12 @@ impl ProcInfo {
         self.login_sessions = vec![
             LoginSessionInfo {
                 lsid: Lsid::Kernel,
+                name: "?".to_owned(),
                 stat: ProcStat::ZERO,
             },
             LoginSessionInfo {
                 lsid: Lsid::SystemdServices,
+                name: "?".to_owned(),
                 stat: ProcStat::ZERO,
             },
         ];
