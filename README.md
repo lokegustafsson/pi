@@ -6,13 +6,13 @@ A work-in-progress graphical process and system monitor for Linux
 
 - Test on somewhat diverse computers
 
-## UI
+### UI
 
 - proc: Color cells by amount
 - proc: Keyboard shortcuts for scrolling
 - proc: Search
 
-## DATA
+### DATA
 
 - proc: libsystemd for lsid tab
 - proc: Network tx/rx
@@ -25,11 +25,9 @@ A work-in-progress graphical process and system monitor for Linux
 - sys/disk: usage and capacity. Per-folder breakdown?
 - sys/cpu: per-cpu temperature?
 
-## PERFORMANCE
+### PERFORMANCE
 
 - plot culling of sys tab
-- tracing on drop (sysinfo, procinfo, egui update)
-
 
 ## Note on procfs-reading-performance
 
