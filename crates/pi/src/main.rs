@@ -7,7 +7,8 @@ use crate::{
 };
 use clap::{Parser, Subcommand};
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers, Ui};
-use ingest::MetricsConsumer;
+use ingest::{MetricsConsumer, ProducerStatus};
+use std::{sync::Mutex, thread, time::Duration};
 use tracing_subscriber::Layer;
 
 mod process;
@@ -45,34 +46,44 @@ fn main() -> Result<(), eframe::Error> {
     )
     .expect("enabling global logger");
 
-    eframe::run_native(
+    let status = Box::leak(Box::new(Mutex::new(ProducerStatus::Running)));
+    let ret = eframe::run_native(
         "pi: process information",
         eframe::NativeOptions {
             initial_window_size: Some(egui::vec2(320.0, 240.0)),
             default_theme: eframe::Theme::Light,
+            run_and_return: true,
             ..Default::default()
         },
-        Box::new(move |cc| {
-            Box::new(State {
-                nav: Navigation {
-                    tab: if cli.focus.is_some() {
-                        NavigationTab::System
-                    } else {
-                        NavigationTab::Process
+        Box::new({
+            let status = &*status;
+            move |cc| {
+                Box::new(State {
+                    nav: Navigation {
+                        tab: if cli.focus.is_some() {
+                            NavigationTab::System
+                        } else {
+                            NavigationTab::Process
+                        },
+                        process: ProcessNavigation::LoginSessions,
+                        system: match cli.focus {
+                            Some(Focus::Cpu) | None => SystemNavigation::Cpu,
+                            Some(Focus::Ram) => SystemNavigation::Ram,
+                            Some(Focus::Disk) => SystemNavigation::Disk,
+                            Some(Focus::Net) => SystemNavigation::Net,
+                            Some(Focus::Gpu) => SystemNavigation::Gpu,
+                        },
                     },
-                    process: ProcessNavigation::LoginSessions,
-                    system: match cli.focus {
-                        Some(Focus::Cpu) | None => SystemNavigation::Cpu,
-                        Some(Focus::Ram) => SystemNavigation::Ram,
-                        Some(Focus::Disk) => SystemNavigation::Disk,
-                        Some(Focus::Net) => SystemNavigation::Net,
-                        Some(Focus::Gpu) => SystemNavigation::Gpu,
-                    },
-                },
-                metrics: MetricsConsumer::start(cc.egui_ctx.clone()),
-            })
+                    metrics: MetricsConsumer::start(cc.egui_ctx.clone(), status),
+                })
+            }
         }),
-    )
+    );
+    ProducerStatus::compare_and_set(status, ProducerStatus::Running, ProducerStatus::Exiting);
+    while !ProducerStatus::compare_and_set(status, ProducerStatus::Exited, ProducerStatus::Exited) {
+        thread::sleep(Duration::from_millis(50));
+    }
+    ret
 }
 
 struct State {
