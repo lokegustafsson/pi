@@ -27,6 +27,12 @@ A work-in-progress graphical process and system monitor for Linux
 
 ## PERFORMANCE
 
-- io_uring, or mmap, for quickly reading procfs? (benchmark)
 - plot culling of sys tab
 - tracing on drop (sysinfo, procinfo, egui update)
+
+
+## Note on procfs-reading-performance
+
+- settled for using `pread64`
+- mmap seems to be unsupported, gives EIO. (And it wouldn't make sense given the `single_open`/`show` internal linux API)
+- io_uring through tokio-uring is just barely on par with the sequential implementation after using sqpoll. No reason to use.
