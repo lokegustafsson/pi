@@ -1,7 +1,7 @@
 use crate::show::Show;
 use eframe::egui::{
     plot::{Corner, Legend, Line, Plot},
-    Frame, Id, Stroke, Ui,
+    Frame, Id, Stroke, TextStyle, Ui,
 };
 use std::ops::RangeInclusive;
 use sysinfo::Series;
@@ -44,6 +44,17 @@ impl<'a> TimeSeries<'a> {
                         TimeSeriesKind::Preview | TimeSeriesKind::Primary => 1.6,
                         TimeSeriesKind::GridCell { .. } => 1.0,
                     })
+                    .with_prop(
+                        match self.kind {
+                            TimeSeriesKind::Primary => {
+                                let h = ui.ctx().available_rect().height()
+                                    - 10.0 * ui.text_style_height(&TextStyle::Body);
+                                Some(f32::min(h, ui.available_width() / 1.6))
+                            }
+                            _ => None,
+                        },
+                        |plot, height| plot.height(height),
+                    )
                     .with_prop(
                         match self.kind {
                             TimeSeriesKind::GridCell { width } => Some(width),

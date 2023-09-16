@@ -261,7 +261,7 @@ impl Page {
         egui::ScrollArea::vertical().show(ui, |ui| {
             crate::vim_like_scroll(
                 ui,
-                2.0 * ui.text_style_height(&TextStyle::Body),
+                4.0 * ui.text_style_height(&TextStyle::Body),
                 40.0 * ui.text_style_height(&TextStyle::Body),
             );
             Frame::none().inner_margin(MARGIN_PIXELS).show(ui, |ui| {
