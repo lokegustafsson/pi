@@ -5,7 +5,7 @@ use crate::{
 };
 use eframe::egui::{
     self, Align, Frame, Grid, Id, Key, KeyboardShortcut, Label, Layout, Modifiers, Sense, Stroke,
-    Ui, Vec2,
+    TextStyle, Ui, Vec2,
 };
 use sysinfo::{Series, SysInfo};
 
@@ -259,6 +259,11 @@ impl Page {
             (ui.available_width() - 2.0 * margin) / (long_side as f32) - MARGIN_PIXELS;
 
         egui::ScrollArea::vertical().show(ui, |ui| {
+            crate::vim_like_scroll(
+                ui,
+                2.0 * ui.text_style_height(&TextStyle::Body),
+                40.0 * ui.text_style_height(&TextStyle::Body),
+            );
             Frame::none().inner_margin(MARGIN_PIXELS).show(ui, |ui| {
                 ui.heading(self.heading);
                 for series in self.main_series {

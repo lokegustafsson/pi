@@ -1,5 +1,7 @@
 use crate::{show::Show, Component};
-use eframe::egui::{self, style::TextStyle, Id, Key, KeyboardShortcut, Modifiers, Sense, Ui};
+use eframe::egui::{
+    self, style::TextStyle, Color32, Frame, Id, Key, KeyboardShortcut, Modifiers, Sense, Ui,
+};
 use procinfo::{ProcInfo, ProcSortBy, ProcStat};
 
 pub struct ProcessTab;
@@ -49,95 +51,78 @@ impl Component for ProcessTab {
         let mut sort_by = info.get_sort_by();
         match nav {
             ProcessNavigation::LoginSessions => {
-                table(
-                    ui,
-                    &info.login_sessions,
-                    "Lsid",
-                    |ui, row| {
-                        ui.label(format!("{:?}", row.lsid));
-                        ui.monospace(&row.name);
-                        stat_labels(ui, &row.stat);
-                    },
-                    &mut sort_by,
-                );
+                Table {
+                    id_header: "Lsid",
+                    sort_by: &mut sort_by,
+                    rows: info.login_sessions.iter().map(|ls| Row {
+                        id: format!("{:?}", ls.lsid),
+                        name: &ls.name,
+                        hover_name: None,
+                        stat: ls.stat,
+                    }),
+                }
+                .render(ui);
             }
             ProcessNavigation::Sessions => {
-                table(
-                    ui,
-                    &info.sessions,
-                    "Sid",
-                    |ui, row| {
-                        ui.label(format!("{:?}", row.sid));
-                        let resp_name = ui.monospace(info.strings.get(row.name));
-                        if !row.entries_cmdline.is_empty() {
-                            ui.interact(resp_name.rect, Id::new("cmdline"), Sense::hover())
-                                .on_hover_ui_at_pointer(|ui| {
-                                    ui.monospace(&row.entries_cmdline);
-                                });
-                        }
-                        stat_labels(ui, &row.stat);
-                    },
-                    &mut sort_by,
-                );
+                Table {
+                    id_header: "Sid",
+                    sort_by: &mut sort_by,
+                    rows: info.sessions.iter().map(|s| Row {
+                        id: format!("{:?}", s.sid),
+                        name: info.strings.get(s.name),
+                        hover_name: (!s.entries_cmdline.is_empty()).then_some(&s.entries_cmdline),
+                        stat: s.stat,
+                    }),
+                }
+                .render(ui);
             }
             ProcessNavigation::Processes => {
-                table(
-                    ui,
-                    &info.processes,
-                    "Pid",
-                    |ui, row| {
-                        ui.label(format!("{:?}", row.pid));
-                        let resp_cmdline = ui.monospace(info.strings.get(row.name));
-                        if let Some(cmdline) = &row.cmdline {
-                            ui.interact(resp_cmdline.rect, Id::new("cmdline"), Sense::hover())
-                                .on_hover_ui_at_pointer(|ui| {
-                                    ui.monospace(&**cmdline);
-                                });
-                        }
-                        stat_labels(ui, &row.stat);
-                    },
-                    &mut sort_by,
-                );
+                Table {
+                    id_header: "Pid",
+                    sort_by: &mut sort_by,
+                    rows: info.processes.iter().map(|p| Row {
+                        id: format!("{:?}", p.pid),
+                        name: info.strings.get(p.name),
+                        hover_name: p.cmdline.as_deref(),
+                        stat: p.stat,
+                    }),
+                }
+                .render(ui);
             }
             ProcessNavigation::Threads => {
-                table(
-                    ui,
-                    &info.threads,
-                    "Tid",
-                    |ui, row| {
-                        ui.label(format!("{:?}", row.tid));
-                        ui.monospace(info.strings.get(row.name));
-                        stat_labels(ui, &row.stat);
-                    },
-                    &mut sort_by,
-                );
+                Table {
+                    id_header: "Tid",
+                    sort_by: &mut sort_by,
+                    rows: info.threads.iter().map(|t| Row {
+                        id: format!("{:?}", t.tid),
+                        name: info.strings.get(t.name),
+                        hover_name: None,
+                        stat: t.stat,
+                    }),
+                }
+                .render(ui);
             }
         }
         info.sort(sort_by);
     }
 }
-fn table<T>(
-    ui: &mut Ui,
-    rows: &[T],
-    id_header: &str,
-    mut f: impl FnMut(&mut Ui, &T),
-    sort_by: &mut ProcSortBy,
-) {
-    let header: [&str; 7] = [
-        &format!("{id_header} (i)"),
-        "Name (n)",
-        "User cpu% (c)",
-        "Sys cpu% (c)",
-        "Disk read (r)",
-        "Disk write (w)",
-        "Mem (m)",
-    ];
-
-    egui::Frame::none().outer_margin(20.0).show(ui, |ui| {
+struct Table<'a, I: Iterator<Item = Row<'a>>> {
+    id_header: &'a str,
+    sort_by: &'a mut ProcSortBy,
+    rows: I,
+}
+struct Row<'a> {
+    id: String,
+    name: &'a str,
+    hover_name: Option<&'a str>,
+    stat: ProcStat,
+}
+impl<'a, I: Iterator<Item = Row<'a>>> Table<'a, I> {
+    fn render(mut self, ui: &mut Ui) {
         let row_height = ui.text_style_height(&TextStyle::Body);
         let spacing = ui.style().spacing.item_spacing;
-        let total_col_spacing = (header.len() - 1) as f32 * spacing.x;
-        let col_width = (ui.available_width() - total_col_spacing) / header.len() as f32;
+        let total_col_spacing = 6.0 * spacing.x;
+        let col_width = (ui.available_width() - total_col_spacing) / 7.0;
         egui::Frame::none()
             .fill(ui.style().visuals.widgets.hovered.bg_fill)
             .show(ui, |ui| {
@@ -145,51 +130,105 @@ fn table<T>(
                     .min_col_width(col_width)
                     .max_col_width(col_width)
                     .spacing(spacing)
-                    .show(ui, |ui| {
-                        for (i, title) in header.iter().enumerate() {
-                            if ui
-                                .selectable_value(
-                                    sort_by,
-                                    match i {
-                                        0 => ProcSortBy::Id,
-                                        1 => ProcSortBy::Name,
-                                        2 | 3 => ProcSortBy::Cpu,
-                                        4 => ProcSortBy::DiskRead,
-                                        5 => ProcSortBy::DiskWrite,
-                                        6 => ProcSortBy::Memory,
-                                        _ => unreachable!(),
-                                    },
-                                    *title,
-                                )
-                                .clicked()
-                            {}
-                        }
-                    });
+                    .show(ui, |ui| self.header(ui));
             });
 
-        egui::ScrollArea::vertical().show_rows(ui, row_height, rows.len(), |ui, row_range| {
+        egui::ScrollArea::vertical().show_rows(ui, row_height, 7, |ui, row_range| {
+            crate::vim_like_scroll(
+                ui,
+                2.0 * row_height,
+                4.0 * row_height * (row_range.end - row_range.start) as f32,
+            );
             egui::Grid::new("table-body")
                 .min_col_width(col_width)
                 .max_col_width(col_width)
                 .spacing(spacing)
                 .striped(true)
                 .start_row(row_range.start)
-                .show(ui, |ui| {
-                    for row in &rows[row_range] {
-                        f(ui, row);
-                        ui.end_row();
-                    }
-                });
+                .show(ui, |ui| self.rows.for_each(|row| row.render(ui)));
         });
-    });
+    }
+    fn header(&mut self, ui: &mut Ui) {
+        for (i, title) in [
+            &format!("{} (i)", self.id_header),
+            "Name (n)",
+            "User cpu% (c)",
+            "Sys cpu% (c)",
+            "Disk read (r)",
+            "Disk write (w)",
+            "Mem (m)",
+        ]
+        .iter()
+        .enumerate()
+        {
+            ui.add_sized(ui.available_size(), |ui: &mut Ui| {
+                ui.selectable_value(
+                    self.sort_by,
+                    match i {
+                        0 => ProcSortBy::Id,
+                        1 => ProcSortBy::Name,
+                        2 | 3 => ProcSortBy::Cpu,
+                        4 => ProcSortBy::DiskRead,
+                        5 => ProcSortBy::DiskWrite,
+                        6 => ProcSortBy::Memory,
+                        _ => unreachable!(),
+                    },
+                    *title,
+                )
+            });
+        }
+    }
 }
-fn stat_labels(ui: &mut Ui, stat: &ProcStat) {
-    ui.label(millis_to_percent(stat.user_time_millis));
-    ui.label(millis_to_percent(stat.system_time_millis));
-    ui.label(Show::rate(stat.disk_read_bytes_per_second as f64, ""));
-    ui.label(Show::rate(stat.disk_write_bytes_per_second as f64, ""));
-    ui.label(Show::size(stat.mem_bytes as f64));
-}
-fn millis_to_percent(v: u32) -> String {
-    format!("{}.{}%", v / 10, v % 10)
+impl<'a> Row<'a> {
+    fn render(self, ui: &mut Ui) {
+        ui.label(self.id);
+        let resp_name = ui.monospace(self.name);
+        if let Some(hover_name) = self.hover_name {
+            ui.interact(resp_name.rect, Id::new("name-hover"), Sense::hover())
+                .on_hover_ui_at_pointer(|ui| {
+                    ui.monospace(hover_name);
+                });
+        }
+        metric_cell(
+            ui,
+            self.stat.user_time_millis > 0,
+            millis_to_percent(self.stat.user_time_millis),
+        );
+        metric_cell(
+            ui,
+            self.stat.system_time_millis > 0,
+            millis_to_percent(self.stat.system_time_millis),
+        );
+        metric_cell(
+            ui,
+            self.stat.disk_read_bytes_per_second > 0,
+            Show::rate(self.stat.disk_read_bytes_per_second as f64, ""),
+        );
+        metric_cell(
+            ui,
+            self.stat.disk_write_bytes_per_second > 0,
+            Show::rate(self.stat.disk_write_bytes_per_second as f64, ""),
+        );
+        metric_cell(ui, false, Show::size(self.stat.mem_bytes as f64));
+        ui.end_row();
+
+        fn metric_cell(ui: &mut Ui, highlight: bool, text: String) {
+            const HIGHLIGHT: Color32 = Color32::from_rgb(245, 196, 97);
+            if highlight {
+                ui.add_sized(ui.available_size(), |ui: &mut Ui| {
+                    Frame::none()
+                        .fill(HIGHLIGHT)
+                        .show(ui, |ui| ui.label(text))
+                        .response
+                });
+            } else {
+                ui.add_sized(ui.available_size(), |ui: &mut Ui| ui.label(text));
+            }
+        }
+
+        fn millis_to_percent(v: u32) -> String {
+            assert!(v % 10 == 0);
+            format!("{}%", v / 10)
+        }
+    }
 }

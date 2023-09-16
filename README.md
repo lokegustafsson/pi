@@ -8,8 +8,6 @@ A work-in-progress graphical process and system monitor for Linux
 
 ### UI
 
-- proc: Color cells by amount
-- proc: Keyboard shortcuts for scrolling
 - proc: Search
 
 ### DATA
