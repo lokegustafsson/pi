@@ -35,11 +35,13 @@ pub struct PidStatus {
     is_kernel: bool,
 }
 impl PidStatus {
-    pub fn new(pid: u32, is_kernel: bool) -> Self {
-        Self {
-            file: File::open(format!("/proc/{pid}/status")).unwrap(),
+    pub fn new(pid: u32, is_kernel: bool) -> Option<Self> {
+        Some(Self {
+            file: File::open(format!("/proc/{pid}/status"))
+                .map_err(check_io_err)
+                .ok()?,
             is_kernel,
-        }
+        })
     }
     pub fn get_uid_gid_vm_rss_kb_threads(&mut self) -> Option<(u16, u16, u64, u32)> {
         let mut uid = 0;
@@ -78,8 +80,10 @@ impl TidIo {
     pub fn new(pid: u32, tid: u32) -> Option<Self> {
         let mut file = match File::open(format!("/proc/{pid}/task/{tid}/io")) {
             Ok(file) => file,
-            Err(err) if err.kind() == io::ErrorKind::PermissionDenied => return None,
-            Err(err) => panic!("{}", err),
+            Err(err) => {
+                check_io_err(err);
+                return None;
+            }
         };
         can_read_from(&mut file).then_some(Self { file })
     }
@@ -109,7 +113,13 @@ pub struct TidStat {
 impl TidStat {
     pub fn new(pid: u32, tid: u32) -> Option<Self> {
         Some(Self {
-            file: File::open(format!("/proc/{pid}/task/{tid}/stat")).unwrap(),
+            file: match File::open(format!("/proc/{pid}/task/{tid}/stat")) {
+                Ok(file) => file,
+                Err(err) => {
+                    check_io_err(err);
+                    return None;
+                }
+            },
         })
     }
     pub fn get_sid_cumulative_user_system_guest_time(&mut self) -> Option<(u32, u64, u64, u64)> {
@@ -149,4 +159,12 @@ fn read_file_to_string<'a>(file: &mut File, buf: &'a mut [u8; 4096]) -> Option<&
 }
 fn can_read_from(file: &mut File) -> bool {
     read_file_to_string(file, &mut [0u8; 4096]).is_some()
+}
+
+#[track_caller]
+fn check_io_err(err: io::Error) {
+    if err.kind() == io::ErrorKind::NotFound || err.kind() == io::ErrorKind::PermissionDenied {
+        return;
+    }
+    panic!("{err}");
 }

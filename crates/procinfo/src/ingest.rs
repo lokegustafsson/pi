@@ -79,7 +79,7 @@ impl ProcessIngest {
                 name,
                 cmdline,
                 by_tid: BTreeMap::new(),
-                status: procfs::PidStatus::new(pid, kernel),
+                status: procfs::PidStatus::new(pid, kernel)?,
                 uid: 0,
                 gid: 0,
                 vm_rss_kb: 0,
@@ -109,21 +109,23 @@ impl ThreadIngest {
             true => Either::Left([pid].into_iter()),
             false => Either::Right(procfs::get_live_tids(pid)),
         } {
-            let mut old = old.remove(&tid).unwrap_or_else(|| ThreadIngest {
-                io: procfs::TidIo::new(pid, tid),
-                cumulative_read_bytes: 0,
-                cumulative_write_bytes: 0,
-                read_bytes: 0,
-                write_bytes: 0,
-                stat: procfs::TidStat::new(pid, tid).unwrap(),
-                sid: 0,
-                cumulative_user_time_ms: 0,
-                cumulative_system_time_ms: 0,
-                cumulative_guest_time_ms: 0,
-                user_time_ms: 0,
-                system_time_ms: 0,
-                guest_time_ms: 0,
-            });
+            let mut old = old.remove(&tid).or_else(|| {
+                Some(ThreadIngest {
+                    io: procfs::TidIo::new(pid, tid),
+                    cumulative_read_bytes: 0,
+                    cumulative_write_bytes: 0,
+                    read_bytes: 0,
+                    write_bytes: 0,
+                    stat: procfs::TidStat::new(pid, tid)?,
+                    sid: 0,
+                    cumulative_user_time_ms: 0,
+                    cumulative_system_time_ms: 0,
+                    cumulative_guest_time_ms: 0,
+                    user_time_ms: 0,
+                    system_time_ms: 0,
+                    guest_time_ms: 0,
+                })
+            })?;
             let (cumulative_read_bytes, cumulative_write_bytes) = match old.io.as_mut() {
                 Some(io) => io.get_cumulative_read_write_bytes()?,
                 None => (0, 0),
