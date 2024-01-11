@@ -6,16 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
-ingest = { path = "../ingest" }
-procinfo = { path = "../procinfo" }
-sysinfo = { path = "../sysinfo" }
-tracing = "0.1"
-tracing-subscriber = "0.3"
-util = { path = "../util" }
-egui_plot = "0.25"
-
-[dependencies.eframe]
-version = "0.25"
-default-features = false
-features = ["default_fonts", "glow", "wayland"]
+clap.workspace = true
+eframe.workspace = true
+egui_plot.workspace = true
+ingest.workspace = true
+procinfo.workspace = true
+sysinfo.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
+util.workspace = true

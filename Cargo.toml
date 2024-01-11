@@ -1,2 +1,20 @@
 [workspace]
 members = [ "crates/*" ]
+
+[workspace.dependencies]
+clap = { version = "4", features = ["derive"] }
+egui = "0.25"
+egui_plot = "0.25"
+either = "1"
+ingest.path = "./crates/ingest"
+nix = { version = "0.27", features = ["uio", "resource", "fs"] }
+procinfo.path = "./crates/procinfo"
+sysinfo.path = "./crates/sysinfo"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+util.path = "./crates/util"
+
+[workspace.dependencies.eframe]
+version = "0.25"
+default-features = false
+features = ["default_fonts", "glow", "wayland"]

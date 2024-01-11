@@ -1,7 +1,5 @@
 use crate::show::Show;
-use eframe::egui::{
-    Frame, Id, Stroke, TextStyle, Ui,
-};
+use eframe::egui::{Frame, Id, Stroke, TextStyle, Ui};
 use egui_plot::{Corner, Legend, Line, Plot};
 use std::ops::RangeInclusive;
 use sysinfo::Series;
@@ -73,12 +71,12 @@ impl<'a> TimeSeries<'a> {
                     .include_y(self.max_y.min(1.2 * series_max_y))
                     .sharp_grid_lines(false)
                     .y_axis_formatter(match self.value_kind {
-                        ValueKind::Bytes => |val, _:_, range: &RangeInclusive<f64>| {
+                        ValueKind::Bytes => |val, _: _, range: &RangeInclusive<f64>| {
                             let maximum = *range.end();
                             Show::size_at_scale(val, maximum)
                         },
-                        ValueKind::Percent => |val, _:_, _: &_| format!("{:.0}%", 100.0 * val),
-                        ValueKind::Temperature => |val, _:_,_: &_| format!("{val}°C"),
+                        ValueKind::Percent => |val, _: _, _: &_| format!("{:.0}%", 100.0 * val),
+                        ValueKind::Temperature => |val, _: _, _: &_| format!("{val}°C"),
                     })
                     .with_prop(
                         match self.kind {
