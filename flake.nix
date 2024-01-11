@@ -53,8 +53,8 @@
             p.rust-bin.stable.latest.rust-analyzer
           ];
           shellHook = ''
-            git rev-parse --is-inside-work-tree > /dev/null && \
-            export CARGO_TARGET_DIR="$HOME/cargo-target-dir$(git rev-parse --show-toplevel)"
+            git rev-parse --is-inside-work-tree > /dev/null && [ -n "$CARGO_TARGET_DIR_PREFIX" ] && \
+            export CARGO_TARGET_DIR="$CARGO_TARGET_DIR_PREFIX$(git rev-parse --show-toplevel)"
           '';
         };
 
