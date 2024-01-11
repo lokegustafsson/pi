@@ -30,6 +30,7 @@ pub struct MetricsConsumer {
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum ProducerStatus {
+    Starting,
     Running,
     Exiting,
     Exited,
@@ -84,6 +85,11 @@ impl MetricsProducer {
         let mut proc_counter = 0;
         loop {
             thread::sleep(TICK_DELAY);
+            ProducerStatus::compare_and_set(
+                status,
+                ProducerStatus::Starting,
+                ProducerStatus::Running,
+            );
             if ProducerStatus::compare_and_set(
                 status,
                 ProducerStatus::Exiting,

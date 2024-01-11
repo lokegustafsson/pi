@@ -30,13 +30,14 @@ enum Focus {
     Gpu,
 }
 
-fn main() -> Result<(), eframe::Error> {
+fn main() {
     let cli = Cli::parse();
 
     tracing::subscriber::set_global_default(
         tracing_subscriber::filter::targets::Targets::new()
             .with_target("eframe::native::run", tracing::Level::INFO)
             .with_target("egui_glow", tracing::Level::INFO)
+            .with_target("polling::epoll", tracing::Level::DEBUG)
             .with_default(tracing::Level::TRACE)
             .with_subscriber(
                 tracing_subscriber::FmtSubscriber::builder()
@@ -46,11 +47,13 @@ fn main() -> Result<(), eframe::Error> {
     )
     .expect("enabling global logger");
 
-    let status = Box::leak(Box::new(Mutex::new(ProducerStatus::Running)));
+    tracing::info!("beginning initialization");
+
+    let status = Box::leak(Box::new(Mutex::new(ProducerStatus::Starting)));
     let ret = eframe::run_native(
         "pi: process information",
         eframe::NativeOptions {
-            initial_window_size: Some(egui::vec2(320.0, 240.0)),
+            viewport: egui::ViewportBuilder::default().with_inner_size(egui::vec2(320.0, 240.0)),
             default_theme: eframe::Theme::Light,
             run_and_return: true,
             ..Default::default()
@@ -58,6 +61,7 @@ fn main() -> Result<(), eframe::Error> {
         Box::new({
             let status = &*status;
             move |cc| {
+                tracing::info!("finishing initialization");
                 Box::new(State {
                     nav: Navigation {
                         tab: if cli.focus.is_some() {
@@ -79,11 +83,24 @@ fn main() -> Result<(), eframe::Error> {
             }
         }),
     );
-    ProducerStatus::compare_and_set(status, ProducerStatus::Running, ProducerStatus::Exiting);
-    while !ProducerStatus::compare_and_set(status, ProducerStatus::Exited, ProducerStatus::Exited) {
-        thread::sleep(Duration::from_millis(50));
+
+    if ProducerStatus::compare_and_set(status, ProducerStatus::Starting, ProducerStatus::Exiting) {
+        // Producer never started
+    } else {
+        ProducerStatus::compare_and_set(status, ProducerStatus::Running, ProducerStatus::Exiting);
+        while !ProducerStatus::compare_and_set(
+            status,
+            ProducerStatus::Exited,
+            ProducerStatus::Exited,
+        ) {
+            tracing::info!("exiting in progress..");
+            thread::sleep(Duration::from_millis(50));
+        }
     }
-    ret
+    match ret {
+        Ok(()) => std::process::exit(0),
+        Err(err) => tracing::error!(?err),
+    }
 }
 
 struct State {

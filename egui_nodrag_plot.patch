@@ -1,11 +1,12 @@
---- a/src/widgets/plot/mod.rs
-+++ b/src/widgets/plot/mod.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
 @@ -653,7 +653,7 @@ impl Plot {
-         };
+         }
 
-         // Allocate the space.
--        let (rect, response) = ui.allocate_exact_size(size, Sense::drag());
-+        let (rect, response) = ui.allocate_exact_size(size, Sense::hover());
+         // Allocate the plot window.
+-        let response = ui.allocate_rect(plot_rect, Sense::drag());
++        let response = ui.allocate_rect(plot_rect, Sense::hover());
+         let rect = plot_rect;
 
          // Load or initialize the memory.
          let plot_id = ui.make_persistent_id(id_source);

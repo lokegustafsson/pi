@@ -2,6 +2,11 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    nixGL = {
+      url = "github:nix-community/nixGL";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+    };
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -15,15 +20,15 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, cargo2nix }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs = inputs:
+  inputs.flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs {
+        pkgs = import inputs.nixpkgs {
           inherit system;
-          overlays = [ cargo2nix.overlays.default ];
+          overlays = [ inputs.cargo2nix.overlays.default inputs.nixGL.overlay ];
           config.allowUnfree = false;
         };
-        lib = nixpkgs.lib;
+        lib = inputs.nixpkgs.lib;
         rust = import ./rust.nix {
           inherit lib pkgs;
           extra-overrides = { mkNativeDep, mkEnvDep, mkRpath, mkOverride, p }:
@@ -37,7 +42,7 @@
                 p.xorg.libXi
                 p.xorg.libXrandr
               ])
-            (mkOverride "egui" (old: {
+            (mkOverride "egui_plot" (old: {
               patches = (old.patches or []) ++ [./egui_nodrag_plot.patch ];
             }))
             ];
@@ -46,7 +51,8 @@
         devShells.default = rust.workspaceShell {
           packages = let p = pkgs;
           in [
-            cargo2nix.outputs.packages.${system}.cargo2nix
+            inputs.cargo2nix.outputs.packages.${system}.cargo2nix
+            p.nixgl.nixGLIntel
             p.cargo-flamegraph
             p.rust-bin.stable.latest.clippy
             p.rust-bin.stable.latest.default
@@ -58,6 +64,12 @@
           '';
         };
 
-        packages.default = rust.pi;
+        packages = rec {
+          default = piNixGLIntel;
+          piNixGLIntel = pkgs.writeShellScriptBin "pi-nixGLIntel" ''
+            exec ${lib.getExe pkgs.nixgl.nixGLIntel} ${lib.getExe rust.pi}
+          '';
+          inherit (rust) pi;
+        };
       });
 }

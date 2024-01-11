@@ -210,7 +210,7 @@ fn left_panel_item(
                     })
                     .show(ui, |ui| {
                         if selected {
-                            let mut v = ui.visuals_mut();
+                            let v = ui.visuals_mut();
                             v.override_text_color = Some(v.selection.stroke.color);
                         }
                         ui.allocate_ui_with_layout(

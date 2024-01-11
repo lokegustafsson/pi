@@ -6,8 +6,8 @@ pub struct Show {
 }
 impl Show {
     const NUM: usize = 5;
-    const RATES: [&str; Self::NUM] = ["B/s", "K/s", "M/s", "G/s", "T/s"];
-    const SIZES: [&str; Self::NUM] = ["B", "KB", "MB", "GB", "TB"];
+    const RATES: [&'static str; Self::NUM] = ["B/s", "K/s", "M/s", "G/s", "T/s"];
+    const SIZES: [&'static str; Self::NUM] = ["B", "KB", "MB", "GB", "TB"];
     const K: f64 = 1000.0;
 
     fn scale_of(num: f64) -> u8 {
