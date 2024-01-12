@@ -160,23 +160,23 @@ pub trait Component {
 fn vim_like_scroll(ui: &mut Ui, small_jump: f32, large_jump: f32) {
     let mut scroll_up = 0.0;
     ui.ctx().input_mut(|i| {
-        if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::K)) {
-            scroll_up += small_jump;
-        }
         if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::J)) {
             scroll_up -= small_jump;
         }
-        if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::U)) {
-            scroll_up += large_jump;
+        if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::K)) {
+            scroll_up += small_jump;
         }
         if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::D)) {
             scroll_up -= large_jump;
         }
-        if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::G)) {
-            scroll_up += f32::INFINITY;
+        if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::U)) {
+            scroll_up += large_jump;
         }
         if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::SHIFT, Key::G)) {
             scroll_up -= f32::INFINITY;
+        }
+        if i.consume_shortcut(&KeyboardShortcut::new(Modifiers::NONE, Key::G)) {
+            scroll_up += f32::INFINITY;
         }
     });
     ui.scroll_with_delta(egui::Vec2::DOWN * scroll_up);

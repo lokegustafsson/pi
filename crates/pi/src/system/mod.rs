@@ -81,7 +81,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
         &[("", &info.total_cpu.total)],
         TimeSeries {
             name: "CPU (c)",
-            max_y: num_cpu as f64,
+            max_y: Some(num_cpu as f64),
             kind: TimeSeriesKind::Preview,
             value_kind: ValueKind::Percent,
         },
@@ -98,7 +98,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
         &[("", &info.global.mem_used)],
         TimeSeries {
             name: "RAM (m)",
-            max_y: info.global.mem_total,
+            max_y: Some(info.global.mem_total),
             kind: TimeSeriesKind::Preview,
             value_kind: ValueKind::Bytes,
         },
@@ -127,7 +127,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
         ],
         TimeSeries {
             name: "DISK (d)",
-            max_y: f64::INFINITY,
+            max_y: None,
             kind: TimeSeriesKind::Preview,
             value_kind: ValueKind::Bytes,
         },
@@ -147,7 +147,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
         ],
         TimeSeries {
             name: "NET (n)",
-            max_y: f64::INFINITY,
+            max_y: None,
             kind: TimeSeriesKind::Preview,
             value_kind: ValueKind::Bytes,
         },
@@ -170,7 +170,7 @@ fn side_panel_items(ui: &mut Ui, nav: &mut SystemNavigation, info: &SysInfo) {
             &[("", &info.total_gpu.gpu_busy)],
             TimeSeries {
                 name: "GPU (g)",
-                max_y: info.by_gpu.len() as f64,
+                max_y: Some(info.by_gpu.len() as f64),
                 kind: TimeSeriesKind::Preview,
                 value_kind: ValueKind::Percent,
             },
@@ -213,19 +213,24 @@ fn left_panel_item(
                             let v = ui.visuals_mut();
                             v.override_text_color = Some(v.selection.stroke.color);
                         }
-                        ui.allocate_ui_with_layout(
-                            ui.available_size(),
-                            Layout::right_to_left(Align::Center),
-                            |ui| {
-                                ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
-                                    ui.add(Label::new(time_series.name).wrap(false));
-                                    for text in sublabels {
-                                        ui.add(Label::new(*text).wrap(false));
-                                    }
-                                });
-                                time_series.render(ui, series);
-                            },
-                        )
+                        ui.horizontal_top(|ui| {
+                            ui.allocate_ui_with_layout(
+                                {
+                                    let Vec2 { x, y } = ui.available_size();
+                                    egui::vec2((x - 90.0) / 1.05, y)
+                                },
+                                Layout::left_to_right(Align::Center),
+                                |ui| {
+                                    time_series.render(ui, series);
+                                },
+                            );
+                            ui.with_layout(Layout::top_down(Align::RIGHT), |ui| {
+                                ui.add(Label::new(time_series.name).wrap(false));
+                                for text in sublabels {
+                                    ui.add(Label::new(*text).wrap(false));
+                                }
+                            });
+                        });
                     });
             })
         })
@@ -292,7 +297,7 @@ impl Page {
             |ui, info| {
                 TimeSeries {
                     name: "Total CPU",
-                    max_y: info.by_cpu.len() as f64,
+                    max_y: Some(info.by_cpu.len() as f64),
                     kind: TimeSeriesKind::Primary,
                     value_kind: ValueKind::Percent,
                 }
@@ -301,7 +306,7 @@ impl Page {
             |ui, info| {
                 TimeSeries {
                     name: "CPU TEMP",
-                    max_y: f64::INFINITY,
+                    max_y: None,
                     kind: TimeSeriesKind::Primary,
                     value_kind: ValueKind::Temperature,
                 }
@@ -313,7 +318,7 @@ impl Page {
             let name = format!("CPU{i}");
             TimeSeries {
                 name: &name,
-                max_y: 1.0,
+                max_y: Some(1.0),
                 kind: TimeSeriesKind::GridCell {
                     width: grid_cell_width,
                 },
@@ -327,7 +332,7 @@ impl Page {
         main_series: &[|ui, info| {
             TimeSeries {
                 name: "RAM",
-                max_y: info.global.mem_total as f64,
+                max_y: Some(info.global.mem_total as f64),
                 kind: TimeSeriesKind::Primary,
                 value_kind: ValueKind::Bytes,
             }
@@ -347,7 +352,7 @@ impl Page {
         main_series: &[|ui, info| {
             TimeSeries {
                 name: "DISK",
-                max_y: f64::INFINITY,
+                max_y: None,
                 kind: TimeSeriesKind::Primary,
                 value_kind: ValueKind::Bytes,
             }
@@ -365,7 +370,7 @@ impl Page {
             let (partition, part_info) = info.by_partition.iter().nth(i).unwrap();
             TimeSeries {
                 name: partition,
-                max_y: f64::INFINITY,
+                max_y: None,
                 kind: TimeSeriesKind::GridCell {
                     width: grid_cell_width,
                 },
@@ -387,7 +392,7 @@ impl Page {
         main_series: &[|ui, info| {
             TimeSeries {
                 name: "NET",
-                max_y: f64::INFINITY,
+                max_y: None,
                 kind: TimeSeriesKind::Primary,
                 value_kind: ValueKind::Bytes,
             }
@@ -404,7 +409,7 @@ impl Page {
             let (interface, interface_info) = info.by_net_interface.iter().nth(i).unwrap();
             TimeSeries {
                 name: interface,
-                max_y: f64::INFINITY,
+                max_y: None,
                 kind: TimeSeriesKind::GridCell {
                     width: grid_cell_width,
                 },
@@ -424,7 +429,7 @@ impl Page {
         main_series: &[|ui, info| {
             TimeSeries {
                 name: "GPU BUSY",
-                max_y: info.by_gpu.len() as f64,
+                max_y: Some(info.by_gpu.len() as f64),
                 kind: TimeSeriesKind::Primary,
                 value_kind: ValueKind::Percent,
             }
@@ -440,7 +445,7 @@ impl Page {
         grid_series: |ui, info, grid_cell_width, i| match i {
             0 => TimeSeries {
                 name: "GPU VRAM",
-                max_y: f64::INFINITY,
+                max_y: None,
                 kind: TimeSeriesKind::GridCell {
                     width: grid_cell_width,
                 },
@@ -450,7 +455,7 @@ impl Page {
 
             1 => TimeSeries {
                 name: "GPU TEMP",
-                max_y: f64::INFINITY,
+                max_y: None,
                 kind: TimeSeriesKind::GridCell {
                     width: grid_cell_width,
                 },

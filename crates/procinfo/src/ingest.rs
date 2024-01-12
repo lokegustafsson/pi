@@ -139,17 +139,22 @@ impl ThreadIngest {
                     io: old.io,
                     cumulative_read_bytes,
                     cumulative_write_bytes,
-                    read_bytes: cumulative_read_bytes - old.cumulative_read_bytes,
-                    write_bytes: cumulative_write_bytes - old.cumulative_write_bytes,
+                    read_bytes: cumulative_read_bytes.saturating_sub(old.cumulative_read_bytes),
+                    write_bytes: cumulative_write_bytes.saturating_sub(old.cumulative_write_bytes),
                     stat: old.stat,
                     sid,
                     cumulative_user_time_ms,
                     cumulative_system_time_ms,
                     cumulative_guest_time_ms,
-                    user_time_ms: (cumulative_user_time_ms - old.cumulative_user_time_ms) as u32,
-                    system_time_ms: (cumulative_system_time_ms - old.cumulative_system_time_ms)
+                    user_time_ms: cumulative_user_time_ms
+                        .saturating_sub(old.cumulative_user_time_ms)
                         as u32,
-                    guest_time_ms: (cumulative_guest_time_ms - old.cumulative_guest_time_ms) as u32,
+                    system_time_ms: cumulative_system_time_ms
+                        .saturating_sub(old.cumulative_system_time_ms)
+                        as u32,
+                    guest_time_ms: cumulative_guest_time_ms
+                        .saturating_sub(old.cumulative_guest_time_ms)
+                        as u32,
                 },
             );
         }
