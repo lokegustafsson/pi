@@ -61,6 +61,7 @@
           shellHook = ''
             git rev-parse --is-inside-work-tree > /dev/null && [ -n "$CARGO_TARGET_DIR_PREFIX" ] && \
             export CARGO_TARGET_DIR="$CARGO_TARGET_DIR_PREFIX$(git rev-parse --show-toplevel)"
+            nixGLIntel zsh
           '';
         };
 
