@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::VecDeque, time::Duration};
 
 pub const SUBSEC: u64 = 60;
 pub const TICK_DELAY: Duration = Duration::from_micros(1_000_000 / SUBSEC);
@@ -30,6 +30,27 @@ impl<const WINDOW_SIZE: usize> Default for WindowMovingAverage<WINDOW_SIZE> {
             i: 0,
             samples: [0.0; WINDOW_SIZE],
         }
+    }
+}
+
+pub struct Resampler {
+    sample_lowpass_rolling_window: VecDeque<f64>,
+    samples: VecDeque<f64>,
+    resamples: VecDeque<f64>,
+}
+impl Resampler {
+    pub fn new(
+        sample_window_size: usize,
+        duration_seconds: usize,
+        nanoseconds_per_sample: usize,
+        nanoseconds_per_resample: usize,
+    ) -> Self {
+        todo!()
+    }
+    pub fn set_nanoseconds_per_resample(&mut self, nanoseconds_per_sample: u32) {}
+    pub fn add_sample(&mut self, sample: f64) {}
+    pub fn get_resampled(&mut self) -> impl '_ + Iterator<Item = f64> {
+        self.resamples.iter().copied()
     }
 }
 
